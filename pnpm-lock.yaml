@@ -28,8 +28,8 @@ importers:
         specifier: 6.0.2
         version: 6.0.2(vite@8.0.16(@types/node@25.9.1)(esbuild@0.28.1))
       '@webgpu/types':
-        specifier: 0.1.70
-        version: 0.1.70
+        specifier: 0.1.71
+        version: 0.1.71
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -614,8 +614,8 @@ packages:
   '@vitest/utils@4.1.7':
     resolution: {integrity: sha512-T532WBu791cBxJlCl6SO+J14l81DQx6uQHm1bQbmCDY7nqlEIgkza/UFnSBNaUtSf41unldDFjdOBYEQC4b5Hw==}
 
-  '@webgpu/types@0.1.70':
-    resolution: {integrity: sha512-LFiNHHKMvmAEvwVew3JLJmTdShhbdwRFSImUshGhE2mGE8ybQzIo63l5uRp+YKnNx+8Qno8Kf6gN+DKMreIJCA==}
+  '@webgpu/types@0.1.71':
+    resolution: {integrity: sha512-mMy8/ODcKhab808co15eW+yN+HgXoQxRQHTiBV9Mrvl1r0ufnid7YOcI+gi4eUWSWl9ezD6TW2KXccrL8HCh2A==}
 
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
@@ -1367,7 +1367,7 @@ snapshots:
       convert-source-map: 2.0.0
       tinyrainbow: 3.1.0
 
-  '@webgpu/types@0.1.70': {}
+  '@webgpu/types@0.1.71': {}
 
   assertion-error@2.0.1: {}
 
