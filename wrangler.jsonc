@@ -1,0 +1,7 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "3d-life-sim",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-07-15",
+  "send_metrics": false
+}

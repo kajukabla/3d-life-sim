@@ -1,0 +1,43 @@
+{
+  "name": "3d-life-sim",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A real-time 3D particle life simulation powered by WebGPU.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "pnpm lint && pnpm test && pnpm build",
+    "deploy": "pnpm build && wrangler pages deploy"
+  },
+  "dependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.1",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "@webgpu/types": "0.1.70",
+    "typescript": "6.0.3",
+    "vite": "8.0.16",
+    "vitest": "4.1.7",
+    "wrangler": "4.111.0"
+  },
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kajukabla/3d-life-sim.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kajukabla/3d-life-sim/issues"
+  },
+  "homepage": "https://3d-life-sim.pages.dev"
+}
