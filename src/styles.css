@@ -552,10 +552,15 @@ button.active {
 
 .audio-panel-title,
 .midi-panel-title {
-  grid-template-columns: minmax(0, 1fr) 40px;
-  margin-bottom: 8px;
+  grid-template-columns: 12px minmax(0, 1fr) 40px;
+  margin-bottom: 0;
   color: #efe5d4;
   font-size: 12px;
+}
+
+.audio-panel[open] > .audio-panel-title,
+.midi-panel[open] > .midi-panel-title {
+  margin-bottom: 8px;
 }
 
 .audio-panel-title strong,
@@ -769,19 +774,39 @@ button.active {
   text-transform: uppercase;
 }
 
-.control-group-collapsible > summary.control-group-title {
+.control-group-collapsible > summary {
   cursor: pointer;
   list-style: none;
   user-select: none;
 }
 
-.control-group-collapsible > summary.control-group-title::before {
-  content: "▸ ";
+.control-group-collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.control-group-collapsible > summary::before {
+  content: "▸";
   color: #5f7377;
 }
 
-.control-group-collapsible[open] > summary.control-group-title::before {
-  content: "▾ ";
+.control-group-collapsible[open] > summary::before {
+  content: "▾";
+  color: #aadfd3;
+}
+
+.control-group-collapsible > summary.control-group-title {
+  margin-bottom: 0;
+  padding: 2px 0 4px;
+}
+
+.control-group-collapsible[open] > summary.control-group-title {
+  margin-bottom: 8px;
+}
+
+.control-group-collapsible > summary:focus-visible {
+  outline: 1px solid #aadfd3;
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 .metrics-grid {
