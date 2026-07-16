@@ -1,13 +1,7 @@
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, PointerEvent, ReactNode } from "react";
-import { CacheCloud, cloudMetrics, CloudMetrics, loadCacheCloud } from "./cacheCloud";
 import { sliderPosToValue, sliderValueToPos } from "./sliderCurve";
-import {
-  CacheRenderer,
-  RenderControls,
-  RenderDiagnostics,
-  renderCacheCanvasPresentation
-} from "./cacheRenderer";
+import type { RenderControls } from "./renderControls";
 import {
   defaultGpuSim3dConfig,
   GpuSim3dSummary,
@@ -89,9 +83,6 @@ import {
 } from "./midiMapping";
 import { selectDemoDriftCandidates, DEMO_DRIFT_DENYLIST } from "./demoDrift";
 import { controlHint } from "./controlHints";
-import { useHueLighting } from "./lighting/useHueLighting";
-import { loopbackHueWsUrl } from "./lighting/hueClient";
-import { demoLightingState, type LightingColorSource } from "./lighting/types";
 
 declare global {
   interface Window {
@@ -181,7 +172,7 @@ declare global {
 }
 
 const deterministicSeed = 3405691582;
-type DisplayMode = "live" | "cache";
+type DisplayMode = "live";
 type SavedSettingsPreset = {
   version: 1 | 2;
   id: string;
@@ -364,8 +355,6 @@ const manualSliderAudioMapping: AudioReactiveMapping = {
 const renderControlSliderTargets = {
   "p-bright": "particleBrightness",
   "particle-size-slider": "particleSizePx",
-  "particle-min-size-slider": "particleMinPx",
-  "particle-max-size-slider": "particleMaxPx",
   "p-opacity": "particleOpacity",
   "particle-density-cutoff-slider": "particleDensityCutoff",
   "particle-density-radius-slider": "particleDensityRadius",
@@ -385,19 +374,6 @@ const renderControlSliderTargets = {
   "particle-support-smoothing-slider": "particleSupportSmoothing",
   "particle-haze-cull-slider": "particleHazeCull",
   "particle-despeckle-slider": "particleDespeckle",
-  "density-strength-slider": "densityPassStrength",
-  "density-small-scale-slider": "densitySmallScale",
-  "density-large-scale-slider": "densityLargeScale",
-  "density-large-threshold-slider": "densityLargeThreshold",
-  "density-contrast-gain-slider": "densityContrastGain",
-  "density-contrast-balance-slider": "densityContrastBalance",
-  "density-emission-power-slider": "densityEmissionPower",
-  "density-occlusion-slider": "densityOcclusion",
-  "accumulation-strength-slider": "accumulationStrength",
-  "accumulation-radius-slider": "accumulationRadius",
-  "accumulation-curve-slider": "accumulationCurve",
-  "accumulation-memory-slider": "accumulationMemory",
-  "accumulation-noise-reject-slider": "accumulationNoiseReject",
   exposure: "exposure",
   "scene-gain": "sceneBrightness",
   "bloom-strength-slider": "bloomStrength",
@@ -413,21 +389,6 @@ const renderControlSliderTargets = {
   "streak-vertical-slider": "streakVertical",
   "flare-height-slider": "flareHeight",
   "flare-cutoff-slider": "flareCutoff",
-  "ribbon-fraction-slider": "ribbonFraction",
-  "ribbon-width-slider": "ribbonWidth",
-  "ribbon-taper-slider": "ribbonTaper",
-  "ribbon-length-slider": "ribbonLength",
-  "ribbon-joints-slider": "ribbonJoints",
-  "ribbon-fade-start-slider": "ribbonFadeStart",
-  "ribbon-edge-fade-slider": "ribbonEdgeFade",
-  "fog-brightness-slider": "fogBrightness",
-  "ray-steps": "raySteps",
-  "fog-scale-slider": "fogRenderScale",
-  "fog-step-scale-slider": "fogStepScale",
-  density: "density",
-  "trail-opacity-slider": "trailOpacity",
-  "trail-cutoff-slider": "trailThreshold",
-  filament: "filament",
   "fov-slider": "fov",
   "aperture-slider": "aperture",
   "dof-blur-slider": "dofBlur",
@@ -474,7 +435,7 @@ const volumeStep = 8;
 const minTrailRadius = 0.0015;
 const maxTrailRadiusCap = 0.28;
 const savedSettingsStorageKey = "fluoddity-3d.saved-settings.v1";
-const filePresetModules = import.meta.glob<string>("../../../Presets/*", {
+const filePresetModules = import.meta.glob<string>("../Presets/*", {
   eager: true,
   import: "default",
   query: "?raw"
@@ -935,7 +896,7 @@ const defaultControls: RenderControls = {
   trailColorMode: "stable",
   fogTint: "#ffffff",
   particleTint: "#ffffff",
-  renderLayer: "both",
+  renderLayer: "particles",
   palette: "aurora",
   filament: 0.72,
   cameraYaw: cameraDefaults.yaw,
@@ -984,8 +945,6 @@ export function App() {
   const audioMicMode = useMemo(() => audioMicFromLaunch(window.location.search), []);
   const appShellRef = useRef<HTMLElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const proofCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const rendererRef = useRef(new CacheRenderer());
   const liveRendererRef = useRef(new RealtimeGpuSim3d());
   // Apply the init-time parallel-compile switch before the renderer's first createPipelines().
   // Idempotent; runs synchronously during render, ahead of any ensureInitialized()/rAF.
@@ -994,8 +953,6 @@ export function App() {
   const pendingLiveResetRef = useRef(false);
   const controlsRef = useRef<RenderControls>(initialLiveState.controls);
   const liveConfigRef = useRef<LiveGpu3dConfig>(initialLiveState.config);
-  const cloudRef = useRef<CacheCloud | null>(null);
-  const displayModeRef = useRef<DisplayMode>("live");
   const playingRef = useRef(initialPlaying);
   const overlayRef = useRef(false);
   const frameRef = useRef(0);
@@ -1003,7 +960,6 @@ export function App() {
   const fpsRef = useRef({ lastTime: 0, frames: 0, value: 0 });
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
   const liveDiagnosticsRef = useRef<LiveGpu3dDiagnostics | null>(null);
-  const renderDiagnosticsRef = useRef<RenderDiagnostics | null>(null);
   const audioReactiveStatusRef = useRef<AudioReactiveSocketStatus>({
     connected: false,
     frameCount: 0,
@@ -1106,7 +1062,6 @@ export function App() {
   // Sim Speed slider (no deterministic seek/replay on unpause). Deterministic seek still runs
   // whenever an external capture seek is pending, so export stays frame-exact regardless.
   const timelineEnabledRef = useRef(false);
-  const [cloud, setCloud] = useState<CacheCloud | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [trackingControls, setTrackingControls] = useState<TrackingControls>(trackingDefaults);
   const [trackState, setTrackState] = useState<{ active: boolean; members: number; miss?: string }>({ active: false, members: 0 });
@@ -1150,10 +1105,7 @@ export function App() {
     lastPickMs: number;
     lastDriftMs: number;
   }>({ active: false, priorOrbit: null, picks: [], lastPickMs: 0, lastDriftMs: 0 });
-  const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
-    const mode = new URLSearchParams(window.location.search).get("mode");
-    return mode === "cache" ? "cache" : "live";
-  });
+  const displayMode: DisplayMode = "live";
   const [controlsState, setControls] = useState<RenderControls>(initialLiveState.controls);
   const [selectedPresetId, setSelectedPresetId] = useState(initialLiveState.presetId);
   const [liveConfig, setLiveConfig] = useState<LiveGpu3dConfig>(initialLiveState.config);
@@ -1179,7 +1131,6 @@ export function App() {
   const [fps, setFps] = useState(0);
   const [savedSettings, setSavedSettings] = useState<SavedSettingsPreset[]>(loadSavedSettings);
   const [selectedSettingsId, setSelectedSettingsId] = useState("");
-  const [renderDiagnostics, setRenderDiagnostics] = useState<RenderDiagnostics | null>(null);
   const [liveDiagnostics, setLiveDiagnostics] = useState<LiveGpu3dDiagnostics | null>(null);
   const [audioStatus, setAudioStatus] = useState<AudioReactiveSocketStatus>(audioReactiveStatusRef.current);
   const [audioPanel, setAudioPanel] = useState<AudioPanelState>(defaultAudioPanelState);
@@ -1192,41 +1143,6 @@ export function App() {
   const [audioReconnectNonce, setAudioReconnectNonce] = useState(0);
   const [sliderModulations, setSliderModulations] = useState<SliderModulationSettings>({});
   const [expandedSliderModulationKey, setExpandedSliderModulationKey] = useState<string | null>(null);
-  // Lighting Editor -> Philips Hue. Off until the user opts in (or ?hue=1) so we
-  // never dial the local helper WebSocket during normal use.
-  const [hueEnabled, setHueEnabled] = useState(() => new URLSearchParams(window.location.search).get("hue") === "1");
-  const [hueBridgeIp, setHueBridgeIp] = useState("");
-  const [huePairing, setHuePairing] = useState(false);
-  const hueWsUrl = useMemo(
-    () => loopbackHueWsUrl(new URLSearchParams(window.location.search).get("hueWs")),
-    []
-  );
-  const getHueColorSource = useCallback<() => LightingColorSource>(
-    () => ({
-      mode: controlsRef.current.particleColorMode,
-      palette: controlsRef.current.palette,
-      tint: controlsRef.current.particleTint
-    }),
-    []
-  );
-  const hue = useHueLighting({ enabled: hueEnabled, wsUrl: hueWsUrl, getColorSource: getHueColorSource });
-  // Pairing polls the bridge for up to ~45s waiting for the link-button press;
-  // clear the optimistic "pairing" hint once the helper reports a terminal state.
-  useEffect(() => {
-    if (hue.hueState.connection === "paired" || hue.hueState.connection === "streaming" || hue.hueState.connection === "error") {
-      setHuePairing(false);
-    }
-  }, [hue.hueState.connection]);
-  // When demo/idle mode engages, the physical lights don't do the normal
-  // slider-drift; they snap to a calm slow out-of-phase oscillation instead. The
-  // rAF demo loop calls this once on activation (see shouldDemo transition).
-  const applyLightingDemoRef = useRef<() => void>(() => {});
-  useEffect(() => {
-    applyLightingDemoRef.current = () => {
-      if (!hueEnabled) return;
-      hue.setLightingState((s) => demoLightingState(s));
-    };
-  }, [hueEnabled, hue.setLightingState]);
   const [midiStatus, setMidiStatus] = useState<MidiPanelStatus>(() => ({
     supported: typeof navigator.requestMIDIAccess === "function",
     enabled: false,
@@ -1280,12 +1196,8 @@ export function App() {
           });
         });
     }
-    loadCacheCloud().then(setCloud).catch((error: unknown) => {
-      setLoadError(error instanceof Error ? error.message : String(error));
-    });
   }, []);
 
-  const metrics = useMemo<CloudMetrics | null>(() => (cloud ? cloudMetrics(cloud) : null), [cloud]);
   const currentSavedUi = useMemo(() => buildSavedUiState({
     playing,
     overlay,
@@ -1309,23 +1221,6 @@ export function App() {
     ),
     [controlsState, displayMode, sliderModulations]
   );
-
-  const switchDisplayMode = useCallback((mode: DisplayMode) => {
-    setDisplayMode(mode);
-    displayModeRef.current = mode;
-    if (mode === "live") {
-      pendingLiveResetRef.current = true;
-      liveDiagnosticsRef.current = null;
-      setLiveDiagnostics(null);
-      frameRef.current = 0;
-      setFrame(0);
-    }
-    setControls((current) => {
-      const next = normalizeRenderControlsForDisplayMode(mode, sanitizeRenderControls(current));
-      controlsRef.current = next;
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     controlsRef.current = controls;
@@ -1791,14 +1686,6 @@ export function App() {
   }, [audioReactiveUrl, audioReconnectNonce, handleAudioFrame]);
 
   useEffect(() => {
-    cloudRef.current = cloud;
-  }, [cloud]);
-
-  useEffect(() => {
-    displayModeRef.current = displayMode;
-  }, [displayMode]);
-
-  useEffect(() => {
     playingRef.current = playing;
   }, [playing]);
 
@@ -1877,8 +1764,6 @@ export function App() {
               demo.lastPickMs = 0;
               touchedSlidersRef.current.clear();
               orbitTouchedRef.current = false;
-              // Lights fall into the calm out-of-phase oscillation rather than drifting.
-              applyLightingDemoRef.current();
             } else if (!shouldDemo && demo.active) {
               demo.active = false;
               // Only undo the demo's auto-orbit if the viewer never took it over. If they did
@@ -1983,9 +1868,7 @@ export function App() {
           const currentControls = smoothedRenderControls(controlsRef.current, cameraRef.current);
           const isPlaying = playingRef.current;
           const isOverlay = overlayRef.current;
-          const mode = displayModeRef.current;
-          const nextFrame = isPlaying ? frameRef.current + 1 : frameRef.current;
-          if (mode === "live") {
+          {
             if (pendingLiveResetRef.current) {
               await liveRendererRef.current.reset();
               pendingLiveResetRef.current = false;
@@ -2080,25 +1963,6 @@ export function App() {
                 if (isPlaying) timelineDispatch({ type: "scrub", frame: targetFrame });
               }, lastUiPublishRef);
             }
-          } else if (cloudRef.current && proofCanvasRef.current) {
-            const diagnostics = await rendererRef.current.render(
-              proofCanvasRef.current,
-              cloudRef.current,
-              currentControls,
-              isOverlay,
-              nextFrame / 60
-            );
-            renderCacheCanvasPresentation(canvasRef.current, cloudRef.current, currentControls, isOverlay);
-            renderDiagnosticsRef.current = diagnostics;
-            if (!cancelled) {
-              if (isPlaying) {
-                frameRef.current = nextFrame;
-              }
-              if (panelOpenRef.current) publishUiDiagnostics(() => {
-                setRenderDiagnostics(diagnostics);
-                setFrame(frameRef.current);
-              }, lastUiPublishRef);
-            }
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -2127,7 +1991,7 @@ export function App() {
     let timer = 0;
     const tick = async () => {
       if (cancelled) return;
-      if (!busy && displayModeRef.current === "live" && trackerRef.current.state.active) {
+      if (!busy && trackerRef.current.state.active) {
         busy = true;
         try {
           const particles = await liveRendererRef.current.captureParticles(TRACKING_PARTICLE_READBACK_LIMIT);
@@ -2173,10 +2037,9 @@ export function App() {
   useEffect(() => {
     window.__fluoddityDiagnostics = () => ({
       webgpu,
-      mode: displayMode,
-      renderer: displayMode === "live" ? liveDiagnosticsRef.current : renderDiagnosticsRef.current,
+      mode: "live",
+      renderer: liveDiagnosticsRef.current,
       live: liveDiagnosticsRef.current,
-      metrics,
       controls,
       audio: {
         status: audioStatus,
@@ -2196,9 +2059,7 @@ export function App() {
         learningKey: midiLearningKey
       },
       fps,
-      vertexCount: displayMode === "live"
-        ? liveVertexCount(liveDiagnosticsRef.current, liveConfig)
-        : cacheVertexCount(renderDiagnosticsRef.current, cloud),
+      vertexCount: liveVertexCount(liveDiagnosticsRef.current, liveConfig),
       savedSettings: savedSettings.map((settings) => ({ id: settings.id, name: settings.name, updatedAt: settings.updatedAt })),
       selectedSettingsId,
       preset: selectedPresetId,
@@ -2207,18 +2068,11 @@ export function App() {
       playing,
       overlay,
       profileGpu,
-      cache: {
-        loaded: !!cloud,
-        pointCount: cloud?.points.length ?? 0,
-        source: "./evidence/cache_points.json",
-        sharedCacheLoaded: !!cloud
-      },
       conformance: {
         deterministicPreset: true,
-        sharedCacheLoaded: !!cloud,
-        visualNonBlank: displayMode === "live" ? (liveDiagnosticsRef.current?.timestep ?? 0) > 0 : !!metrics && metrics.densitySum > 1,
+        visualNonBlank: (liveDiagnosticsRef.current?.timestep ?? 0) > 0,
         webgpuProbeComplete: webgpu.checked,
-        webgpuRenderer: displayMode === "live" ? liveDiagnosticsRef.current?.renderer === "webgpu-live-fluoddity-3d" : renderDiagnosticsRef.current?.renderer === "webgpu-point-volume",
+        webgpuRenderer: liveDiagnosticsRef.current?.renderer === "webgpu-live-fluoddity-3d",
         webgpuCompute3d: compute3d?.passed === true,
         webgpuLive3d: liveWebGpuConformance(liveDiagnosticsRef.current)
       }
@@ -2226,7 +2080,7 @@ export function App() {
     return () => {
       delete window.__fluoddityDiagnostics;
     };
-  }, [audioActiveInput, audioBackendError, audioInputDevices, audioLastFrame, audioMeters, audioPanel, audioPendingInput, audioStatus, cloud, compute3d, controls, displayMode, fps, frame, liveConfig, liveDiagnostics, metrics, midiActiveInputId, midiInputs, midiLearningKey, midiStatus, overlay, profileGpu, renderDiagnostics, savedSettings, selectedPresetId, selectedSettingsId, sliderModulations, webgpu]);
+  }, [audioActiveInput, audioBackendError, audioInputDevices, audioLastFrame, audioMeters, audioPanel, audioPendingInput, audioStatus, compute3d, controls, fps, frame, liveConfig, liveDiagnostics, midiActiveInputId, midiInputs, midiLearningKey, midiStatus, overlay, profileGpu, savedSettings, selectedPresetId, selectedSettingsId, sliderModulations, webgpu]);
 
   useEffect(() => {
     const toBase64 = (array: Float32Array): string => {
@@ -2955,16 +2809,11 @@ export function App() {
     const preset = getLivePreset(presetId);
     const current = liveConfigRef.current;
     const usesPresetRenderControls = Boolean(preset.renderControls);
-    const nextDisplayMode = preset.renderControls?.renderLayer === "volume-density" || preset.renderControls?.renderLayer === "accumulation" ? "live" : displayModeRef.current;
     setSelectedPresetId(preset.id);
     setSelectedSettingsId("");
-    if (nextDisplayMode !== displayModeRef.current) {
-      displayModeRef.current = nextDisplayMode;
-      setDisplayMode(nextDisplayMode);
-    }
     if (preset.renderControls) {
       setControls((currentControls) => {
-        const nextControls = normalizeRenderControlsForDisplayMode(nextDisplayMode, {
+        const nextControls = normalizeRenderControlsForDisplayMode("live", {
           ...currentControls,
           ...preset.renderControls
         });
@@ -2983,15 +2832,12 @@ export function App() {
 
   const applySettingsPreset = useCallback((settings: SavedSettingsPreset) => {
     const nextConfig = sanitizeLiveConfig(settings.liveConfig);
-    const nextDisplayMode = settings.displayMode;
-    const nextControls = normalizeRenderControlsForDisplayMode(nextDisplayMode, sanitizeRenderControls(settings.controls));
+    const nextControls = normalizeRenderControlsForDisplayMode("live", sanitizeRenderControls(settings.controls));
     const uiSource = isRecord(settings.ui) ? settings.ui : settings;
     const nextUi = sanitizeSavedUiState(uiSource, fallbackPlayingForSavedUi(uiSource));
     const nextAudio = sanitizeSavedAudioState(settings.audio);
     setSelectedSettingsId(settings.id);
     setSelectedPresetId(settings.presetId);
-    setDisplayMode(nextDisplayMode);
-    displayModeRef.current = nextDisplayMode;
     setPlaying(nextUi.playing);
     playingRef.current = nextUi.playing;
     setOverlay(nextUi.overlay);
@@ -3279,7 +3125,7 @@ export function App() {
 
   const pickAtClient = useCallback(async (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
-    if (!canvas || displayModeRef.current !== "live") return;
+    if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const width = Math.max(1, rect.width);
     const height = Math.max(1, rect.height);
@@ -3412,7 +3258,6 @@ export function App() {
     presetId: selectedPresetId,
     displayMode,
     seed: deterministicSeed,
-    source: "artifacts/cache/cache_points.json",
     controls: normalizeRenderControlsForDisplayMode(
       displayMode,
       renderControlsWithModulationRangeOverrides(sanitizeRenderControls(controls), controls, currentSavedAudio.sliders)
@@ -3421,9 +3266,7 @@ export function App() {
     ui: currentSavedUi,
     audio: currentSavedAudio
   }, null, 2), [controls, currentSavedAudio, currentSavedUi, displayMode, liveConfig, selectedPresetId]);
-  const vertexCount = displayMode === "live"
-    ? liveVertexCount(liveDiagnostics, liveConfig)
-    : cacheVertexCount(renderDiagnostics, cloud);
+  const vertexCount = liveVertexCount(liveDiagnostics, liveConfig);
   return (
     <SliderModulationContext.Provider value={sliderModulationContext}>
       <main ref={appShellRef} className={`app-shell${panelOpen ? "" : " panel-collapsed"}${cursorIdle ? " cursor-idle" : ""}`}>
@@ -3439,7 +3282,6 @@ export function App() {
           onLostPointerCapture={endTumble}
           onAuxClick={(event) => event.preventDefault()}
         />
-        <canvas ref={proofCanvasRef} className="webgpu-proof-canvas" aria-hidden="true" />
         {panelOpen ? (
           <div className="viewport-stats" data-testid="viewport-stats" aria-label="Viewport performance">
             <div><span>FPS</span><strong>{fps > 0 ? fps.toFixed(0) : "..."}</strong></div>
@@ -3452,10 +3294,9 @@ export function App() {
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               webgpu,
-              mode: displayMode,
-              renderer: displayMode === "live" ? liveDiagnostics : renderDiagnostics,
+              mode: "live",
+              renderer: liveDiagnostics,
               live: liveDiagnostics,
-              metrics,
               controls,
               audio: {
                 status: audioStatus,
@@ -3489,10 +3330,6 @@ export function App() {
       </section>
 
       <aside id="control-panel" className="control-panel" data-testid="control-panel" aria-label="3D Life cockpit controls">
-        <div className="panel-row mode-row" role="group" aria-label="Display mode">
-          <button data-testid="mode-live" className={displayMode === "live" ? "active" : ""} onClick={() => switchDisplayMode("live")}>Live 3D</button>
-          <button data-testid="mode-cache" className={displayMode === "cache" ? "active" : ""} onClick={() => switchDisplayMode("cache")}>Cache</button>
-        </div>
         <div className="panel-row button-row">
           <button data-testid="play-toggle" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play"}</button>
           <button data-testid="timeline-toggle" className={timelineEnabled ? "active" : ""} onClick={() => setTimelineEnabled((value) => !value)}>{timelineEnabled ? "Timeline: On" : "Timeline: Off"}</button>
@@ -3532,7 +3369,7 @@ export function App() {
           <button className="wide-button" data-testid="randomize-all" onClick={randomizeAllParameters}>Randomize all parameters</button>
         </div>
 
-        {displayMode === "live" && timelineEnabled && (
+        {timelineEnabled && (
           <TimelineBar
             state={timeline}
             onTogglePlay={() => setPlaying((value) => !value)}
@@ -3541,85 +3378,6 @@ export function App() {
             onSetSpeed={(speed) => timelineDispatch({ type: "set-speed", speed })}
           />
         )}
-
-        <CollapsibleGroup title="Lighting Editor" testId="lighting-editor" defaultOpen>
-          <Checkbox label="Enable Hue" testId="lighting-enable" checked={hueEnabled} onChange={setHueEnabled} />
-          <div className="panel-row" data-testid="lighting-status">
-            <span title={controlHint("Lighting Status")}>Status</span>
-            <output data-testid="lighting-connection">{huePairing ? "pairing — press the bridge link button" : `${hue.hueState.connection}${hue.hueState.error ? ` — ${hue.hueState.error}` : ""}`}</output>
-          </div>
-          {hueEnabled ? (
-            <>
-              <label className="control-row">
-                <span title={controlHint("Bridge IP")}>Bridge IP</span>
-                <input
-                  data-testid="lighting-bridge-ip"
-                  name="lighting-bridge-ip"
-                  type="text"
-                  placeholder="auto / 192.168.x.x"
-                  value={hueBridgeIp}
-                  onChange={(event) => setHueBridgeIp(event.target.value)}
-                />
-                <output />
-              </label>
-              <div className="panel-row button-row">
-                <button type="button" data-testid="lighting-discover" onClick={() => hue.actions.discover()}>Discover</button>
-                <button type="button" data-testid="lighting-pair" onClick={() => { setHuePairing(true); hue.actions.pair(hueBridgeIp || hue.hueState.bridges[0]?.ip || ""); }}>{huePairing ? "Pairing…" : "Pair"}</button>
-                <button type="button" data-testid="lighting-ensure-area" onClick={() => hue.actions.ensureArea()}>Build Area</button>
-                <button type="button" data-testid="lighting-start" onClick={() => hue.actions.start()}>Start</button>
-                <button type="button" data-testid="lighting-stop" onClick={() => hue.actions.stop()}>Stop</button>
-              </div>
-              {hue.hueState.bridges.length ? (
-                <div className="status-list" data-testid="lighting-bridges">
-                  {hue.hueState.bridges.map((bridge) => (
-                    <button type="button" key={bridge.ip} onClick={() => setHueBridgeIp(bridge.ip)}>{bridge.ip}</button>
-                  ))}
-                </div>
-              ) : null}
-              <div className="panel-row" data-testid="lighting-following">
-                <span title={controlHint("Following")}>Following</span>
-                <output>{controls.particleColorMode === "solid" ? `solid ${controls.particleTint}` : `${controls.particleColorMode} / ${controls.palette}`}</output>
-              </div>
-              {hue.lightConfigs.length ? (
-                <div className="status-list" data-testid="lighting-lights">
-                  {hue.lightConfigs.map((light) => (
-                    <Checkbox
-                      key={light.channel}
-                      label={light.name}
-                      testId={`lighting-light-${light.channel}`}
-                      checked={light.enabled}
-                      onChange={(value) => hue.setLightEnabled(light.channel, value)}
-                    />
-                  ))}
-                </div>
-              ) : null}
-              <Slider label="Scrub" value={hue.lightingState.scrub} min={0} max={1} step={0.001} testId="lighting-scrub-slider" onChange={(scrub) => hue.setLightingState((s) => ({ ...s, scrub }))} />
-              <Slider label="Scrub Rate" value={hue.lightingState.scrubRateHz} min={-1} max={1} step={0.001} testId="lighting-scrub-rate-slider" onChange={(scrubRateHz) => hue.setLightingState((s) => ({ ...s, scrubRateHz }))} />
-              <Checkbox label="Lock Sync" testId="lighting-lock" checked={hue.lightingState.locked} onChange={(locked) => hue.setLightingState((s) => ({ ...s, locked }))} />
-              {!hue.lightingState.locked ? (
-                <>
-                  <Slider label="Phase Spread" value={hue.lightingState.phaseSpread} min={0} max={1} step={0.01} testId="lighting-phase-spread-slider" onChange={(phaseSpread) => hue.setLightingState((s) => ({ ...s, phaseSpread }))} />
-                  <Slider label="Freq Spread" value={hue.lightingState.freqSpread} min={0} max={2} step={0.01} testId="lighting-freq-spread-slider" onChange={(freqSpread) => hue.setLightingState((s) => ({ ...s, freqSpread }))} />
-                  <div className="panel-row button-row">
-                    <button type="button" data-testid="lighting-align" onClick={() => hue.setLightingState((s) => ({ ...s, phaseSpread: 0, freqSpread: 0 }))}>Align</button>
-                  </div>
-                </>
-              ) : null}
-              <ModeSelect
-                label="Loop"
-                value={hue.lightingState.loopMode}
-                options={[["pingpong", "Ping-Pong"], ["repeat", "Repeat (cut)"]]}
-                onChange={(value) => hue.setLightingState((s) => ({ ...s, loopMode: value === "repeat" ? "repeat" : "pingpong" }))}
-              />
-              <Slider label="Master" value={hue.lightingState.master} min={0} max={1} step={0.01} testId="lighting-master-slider" onChange={(master) => hue.setLightingState((s) => ({ ...s, master }))} />
-              <Slider label="Gamma" value={hue.lightingState.gamma} min={0.2} max={3} step={0.01} testId="lighting-gamma-slider" onChange={(gamma) => hue.setLightingState((s) => ({ ...s, gamma }))} />
-              <Checkbox label="Strobe" testId="lighting-strobe-enable" checked={hue.lightingState.strobe.enabled} onChange={(enabled) => hue.setLightingState((s) => ({ ...s, strobe: { ...s.strobe, enabled } }))} />
-              <Slider label="Strobe Hz" value={hue.lightingState.strobe.hz} min={0.5} max={20} step={0.1} testId="lighting-strobe-hz-slider" onChange={(hz) => hue.setLightingState((s) => ({ ...s, strobe: { ...s.strobe, hz } }))} />
-              <Slider label="Strobe Duty" value={hue.lightingState.strobe.duty} min={0.05} max={0.95} step={0.01} testId="lighting-strobe-duty-slider" onChange={(duty) => hue.setLightingState((s) => ({ ...s, strobe: { ...s.strobe, duty } }))} />
-              <Slider label="Brightness" value={hue.lightingState.brightness} min={0} max={1} step={0.01} testId="lighting-brightness-slider" onChange={(brightness) => hue.setLightingState((s) => ({ ...s, brightness }))} />
-            </>
-          ) : null}
-        </CollapsibleGroup>
 
         <PresetSelect value={selectedPresetId} onChange={applyPreset} />
         <ControlGroup title="Settings">
@@ -3642,9 +3400,8 @@ export function App() {
         <NumberField label="Seed" value={deterministicSeed} readOnly testId="seed-input" />
         <ControlGroup title="Particles">
           <NumberField
-            label={displayMode === "live" ? "Particles" : "Cache Points"}
-            value={displayMode === "live" ? liveConfig.particleCount : cloud?.points.length ?? 0}
-            readOnly={displayMode !== "live"}
+            label="Particles"
+            value={liveConfig.particleCount}
             min={minLiveParticles}
             step={liveParticleStep}
             testId="particle-input"
@@ -3668,17 +3425,10 @@ export function App() {
               final contribution. P Opacity is the single particle-intensity knob now; brightness
               stays at its preset/default value so saved looks (incl. presets) are unchanged. */}
           <Slider label="P Scale" value={controls.particleSizePx} {...renderSliderRanges.particleSizePx} testId="particle-size-slider" onChange={(particleSizePx) => setControls((c) => ({ ...c, particleSizePx }))} />
-          {displayMode === "cache" && (
-            <>
-              <Slider label="P Min Px" value={controls.particleMinPx} {...renderSliderRanges.particleMinPx} testId="particle-min-size-slider" onChange={(particleMinPx) => setControls((c) => ({ ...c, particleMinPx, particleMaxPx: Math.max(c.particleMaxPx, particleMinPx) }))} />
-              <Slider label="P Max Px" value={controls.particleMaxPx} {...renderSliderRanges.particleMaxPx} testId="particle-max-size-slider" onChange={(particleMaxPx) => setControls((c) => ({ ...c, particleMaxPx, particleMinPx: Math.min(c.particleMinPx, particleMaxPx) }))} />
-            </>
-          )}
           <Slider label="P Opacity" value={controls.particleOpacity} {...renderSliderRanges.particleOpacity} onChange={(particleOpacity) => setControls((c) => ({ ...c, particleOpacity }))} />
           <Slider label="P Cutoff" value={controls.particleDensityCutoff} {...renderSliderRanges.particleDensityCutoff} curve={3} testId="particle-density-cutoff-slider" onChange={(particleDensityCutoff) => setControls((c) => ({ ...c, particleDensityCutoff }))} />
           <Slider label="P Radius" value={controls.particleDensityRadius} {...renderSliderRanges.particleDensityRadius} testId="particle-density-radius-slider" onChange={(particleDensityRadius) => setControls((c) => ({ ...c, particleDensityRadius }))} />
-          {displayMode === "live" && (
-            <>
+          <>
               <Slider label="P Keep" value={controls.particleDensityNormalize} {...renderSliderRanges.particleDensityNormalize} testId="particle-density-normalize-slider" onChange={(particleDensityNormalize) => setControls((c) => ({ ...c, particleDensityNormalize }))} />
               <Slider label="P Soft" value={controls.particleDensitySoftness} {...renderSliderRanges.particleDensitySoftness} testId="particle-density-softness-slider" onChange={(particleDensitySoftness) => setControls((c) => ({ ...c, particleDensitySoftness }))} />
               <Slider label="Support" value={controls.particleSupportMask} {...renderSliderRanges.particleSupportMask} testId="particle-support-mask-slider" onChange={(particleSupportMask) => setControls((c) => ({ ...c, particleSupportMask }))} />
@@ -3689,8 +3439,7 @@ export function App() {
               <Slider label="Despeckle" value={controls.particleDespeckle} {...renderSliderRanges.particleDespeckle} testId="particle-despeckle-slider" onChange={(particleDespeckle) => setControls((c) => ({ ...c, particleDespeckle }))} />
               <Slider label="Supp Smooth" value={controls.particleSupportSmoothing} {...renderSliderRanges.particleSupportSmoothing} testId="particle-support-smoothing-slider" onChange={(particleSupportSmoothing) => setControls((c) => ({ ...c, particleSupportSmoothing }))} />
               <Checkbox label="Cutoff Prepass" checked={controls.particleCutoffPrepass} testId="cutoff-prepass-checkbox" onChange={(particleCutoffPrepass) => setControls((c) => ({ ...c, particleCutoffPrepass }))} />
-            </>
-          )}
+          </>
           <Checkbox label="Recycle" checked={liveConfig.recycleEnabled} onChange={(recycleEnabled) => updateLiveConfig({ recycleEnabled })} />
           <Slider label="Flow Color" value={liveConfig.hueSensitivity} {...liveSliderRanges.hueSensitivity} testId="hue-sensitivity-slider" onChange={(hueSensitivity) => updateLiveConfig({ hueSensitivity })} />
           <Checkbox label="Vel Stretch" checked={controls.particleVelocityStretch} testId="particle-velocity-stretch-checkbox" onChange={(particleVelocityStretch) => setControls((c) => ({ ...c, particleVelocityStretch }))} />
@@ -3727,30 +3476,7 @@ export function App() {
           <Slider label="Hue Hi" value={controls.variationColorMax} {...renderSliderRanges.variationColorMax} testId="variation-color-max-slider" onChange={(variationColorMax) => setControls((c) => ({ ...c, variationColorMax, variationColorMin: Math.min(c.variationColorMin, variationColorMax) }))} />
         </ControlGroup>
 
-        <ControlGroup title="Density">
-          <Slider label="D Emit" value={controls.densityPassStrength} {...renderSliderRanges.densityPassStrength} testId="density-strength-slider" onChange={(densityPassStrength) => setControls((c) => ({ ...c, densityPassStrength }))} />
-          <Slider label="D Small" value={controls.densitySmallScale} {...renderSliderRanges.densitySmallScale} testId="density-small-scale-slider" onChange={(densitySmallScale) => setControls((c) => ({ ...c, densitySmallScale }))} />
-          <Slider label="D Large" value={controls.densityLargeScale} {...renderSliderRanges.densityLargeScale} testId="density-large-scale-slider" onChange={(densityLargeScale) => setControls((c) => ({ ...c, densityLargeScale }))} />
-          <Checkbox label="Half Large" checked={controls.densityLargeHalfRes} testId="density-large-halfres-checkbox" onChange={(densityLargeHalfRes) => setControls((c) => ({ ...c, densityLargeHalfRes }))} />
-          <Slider label="D Mask" value={controls.densityLargeThreshold} {...renderSliderRanges.densityLargeThreshold} testId="density-large-threshold-slider" onChange={(densityLargeThreshold) => setControls((c) => ({ ...c, densityLargeThreshold }))} />
-          <Slider label="D Gain" value={controls.densityContrastGain} {...renderSliderRanges.densityContrastGain} testId="density-contrast-gain-slider" onChange={(densityContrastGain) => setControls((c) => ({ ...c, densityContrastGain }))} />
-          <Slider label="D Ridges" value={controls.densityContrastBalance} {...renderSliderRanges.densityContrastBalance} testId="density-contrast-balance-slider" onChange={(densityContrastBalance) => setControls((c) => ({ ...c, densityContrastBalance }))} />
-          <Slider label="D Curve" value={controls.densityEmissionPower} {...renderSliderRanges.densityEmissionPower} testId="density-emission-power-slider" onChange={(densityEmissionPower) => setControls((c) => ({ ...c, densityEmissionPower }))} />
-          <Slider label="D Occlude" value={controls.densityOcclusion} {...renderSliderRanges.densityOcclusion} testId="density-occlusion-slider" onChange={(densityOcclusion) => setControls((c) => ({ ...c, densityOcclusion }))} />
-        </ControlGroup>
-
-        <ControlGroup title="Accumulation">
-          <Slider label="A Gain" value={controls.accumulationStrength} {...renderSliderRanges.accumulationStrength} testId="accumulation-strength-slider" onChange={(accumulationStrength) => setControls((c) => ({ ...c, accumulationStrength }))} />
-          <Slider label="A Radius" value={controls.accumulationRadius} {...renderSliderRanges.accumulationRadius} testId="accumulation-radius-slider" onChange={(accumulationRadius) => setControls((c) => ({ ...c, accumulationRadius }))} />
-          <Slider label="A Curve" value={controls.accumulationCurve} {...renderSliderRanges.accumulationCurve} testId="accumulation-curve-slider" onChange={(accumulationCurve) => setControls((c) => ({ ...c, accumulationCurve }))} />
-          <Slider label="A Memory" value={controls.accumulationMemory} {...renderSliderRanges.accumulationMemory} testId="accumulation-memory-slider" onChange={(accumulationMemory) => setControls((c) => ({ ...c, accumulationMemory }))} />
-          <Slider label="A Reject" value={controls.accumulationNoiseReject} {...renderSliderRanges.accumulationNoiseReject} testId="accumulation-noise-reject-slider" onChange={(accumulationNoiseReject) => setControls((c) => ({ ...c, accumulationNoiseReject }))} />
-        </ControlGroup>
-
         <ControlGroup title="Render">
-          <LayerSelect displayMode={displayMode} value={controls.renderLayer} onChange={(renderLayer) => setControls((c) => ({ ...c, renderLayer }))} />
-          <Select label="Palette" value={controls.palette} onChange={(palette) => setControls((c) => ({ ...c, palette }))} />
-          <ColorField label="Fog Tint" value={controls.fogTint} onChange={(fogTint) => setControls((c) => ({ ...c, fogTint }))} />
           <Slider label="Exposure" value={controls.exposure} {...renderSliderRanges.exposure} onChange={(exposure) => setControls((c) => ({ ...c, exposure }))} />
           <Slider label="Scene Gain" value={controls.sceneBrightness} {...renderSliderRanges.sceneBrightness} onChange={(sceneBrightness) => setControls((c) => ({ ...c, sceneBrightness }))} />
           <Slider label="Bloom" value={controls.bloomStrength} {...renderSliderRanges.bloomStrength} testId="bloom-strength-slider" onChange={(bloomStrength) => setControls((c) => ({ ...c, bloomStrength }))} />
@@ -3766,22 +3492,10 @@ export function App() {
           <Slider label="Flare Star" value={controls.streakVertical} {...renderSliderRanges.streakVertical} testId="streak-vertical-slider" onChange={(streakVertical) => setControls((c) => ({ ...c, streakVertical }))} />
           <Slider label="Flare Height" value={controls.flareHeight} {...renderSliderRanges.flareHeight} testId="flare-height-slider" onChange={(flareHeight) => setControls((c) => ({ ...c, flareHeight }))} />
           <Slider label="Flare Cutoff" value={controls.flareCutoff} {...renderSliderRanges.flareCutoff} testId="flare-cutoff-slider" onChange={(flareCutoff) => setControls((c) => ({ ...c, flareCutoff }))} />
-          <Slider label="Ribbon %" value={controls.ribbonFraction} {...renderSliderRanges.ribbonFraction} curve={3} testId="ribbon-fraction-slider" onChange={(ribbonFraction) => setControls((c) => ({ ...c, ribbonFraction }))} />
-          <Slider label="Ribbon W ×" value={controls.ribbonWidth} {...renderSliderRanges.ribbonWidth} testId="ribbon-width-slider" onChange={(ribbonWidth) => setControls((c) => ({ ...c, ribbonWidth }))} />
-          <Slider label="Ribbon Fade" value={controls.ribbonTaper} {...renderSliderRanges.ribbonTaper} testId="ribbon-taper-slider" onChange={(ribbonTaper) => setControls((c) => ({ ...c, ribbonTaper }))} />
-          <Slider label="Ribbon Len" value={controls.ribbonLength} {...renderSliderRanges.ribbonLength} testId="ribbon-length-slider" onChange={(ribbonLength) => setControls((c) => ({ ...c, ribbonLength }))} />
-          <Slider label="Ribbon Joints" value={controls.ribbonJoints} {...renderSliderRanges.ribbonJoints} testId="ribbon-joints-slider" onChange={(ribbonJoints) => setControls((c) => ({ ...c, ribbonJoints }))} />
-          <Slider label="Ribbon Fade Start" value={controls.ribbonFadeStart} {...renderSliderRanges.ribbonFadeStart} testId="ribbon-fade-start-slider" onChange={(ribbonFadeStart) => setControls((c) => ({ ...c, ribbonFadeStart }))} />
-          <Slider label="Ribbon Edge Fade" value={controls.ribbonEdgeFade} {...renderSliderRanges.ribbonEdgeFade} testId="ribbon-edge-fade-slider" onChange={(ribbonEdgeFade) => setControls((c) => ({ ...c, ribbonEdgeFade }))} />
-          <Slider label="Fog Bright" value={controls.fogBrightness} {...renderSliderRanges.fogBrightness} testId="fog-brightness-slider" onChange={(fogBrightness) => setControls((c) => ({ ...c, fogBrightness }))} />
-          <Slider label="Ray Res" value={controls.rayResolution} {...rayResolutionSliderRange} onChange={(rayResolution) => setControls((c) => ({ ...c, rayResolution: clampRayResolution(rayResolution) }))} />
-          <Slider label="Ray Steps" value={controls.raySteps} {...renderSliderRanges.raySteps} onChange={(raySteps) => setControls((c) => ({ ...c, raySteps }))} />
-          <Slider label="Fog Scale" value={controls.fogRenderScale} {...renderSliderRanges.fogRenderScale} testId="fog-scale-slider" onChange={(fogRenderScale) => setControls((c) => ({ ...c, fogRenderScale }))} />
-          <Slider label="Fog Steps" value={controls.fogStepScale} {...renderSliderRanges.fogStepScale} testId="fog-step-scale-slider" onChange={(fogStepScale) => setControls((c) => ({ ...c, fogStepScale }))} />
+          <Slider label="Render Res" value={controls.rayResolution} {...rayResolutionSliderRange} onChange={(rayResolution) => setControls((c) => ({ ...c, rayResolution: clampRayResolution(rayResolution) }))} />
           <NumberField
             label="Sim Res"
             value={liveConfig.width}
-            readOnly={displayMode !== "live"}
             min={minVolumeSize}
             max={maxVolumeSize}
             step={volumeStep}
@@ -3793,14 +3507,9 @@ export function App() {
           />
         </ControlGroup>
 
-        <ControlGroup title="Trails">
-          <TrailColorSelect value={controls.trailColorMode} onChange={(trailColorMode) => setControls((c) => ({ ...c, trailColorMode }))} />
+        <ControlGroup title="Trail Field">
           <Slider label="Emit" value={liveConfig.depositMass} {...liveSliderRanges.depositMass} testId="trail-amount-slider" onChange={(depositMass) => updateLiveConfig({ depositMass })} />
           <Slider label="Radius" value={liveConfig.depositRadius} min={trailRadiusSliderRange.min} max={maxSupportedTrailRadius(liveConfig)} step={trailRadiusSliderRange.step} testId="trail-radius-slider" onChange={(depositRadius) => updateLiveConfig({ depositRadius })} />
-          <Slider label="Density" value={controls.density} {...renderSliderRanges.density} onChange={(density) => setControls((c) => ({ ...c, density }))} />
-          <Slider label="Opacity" value={controls.trailOpacity} {...renderSliderRanges.trailOpacity} testId="trail-opacity-slider" onChange={(trailOpacity) => setControls((c) => ({ ...c, trailOpacity }))} />
-          <Slider label="Cutoff" value={controls.trailThreshold} {...renderSliderRanges.trailThreshold} testId="trail-cutoff-slider" onChange={(trailThreshold) => setControls((c) => ({ ...c, trailThreshold }))} />
-          <Slider label="Filament" value={controls.filament} {...renderSliderRanges.filament} onChange={(filament) => setControls((c) => ({ ...c, filament }))} />
           <Slider label="Persist" value={liveConfig.trailPersistence} {...liveSliderRanges.trailPersistence} testId="trail-persistence-slider" onChange={(trailPersistence) => updateLiveConfig({ trailPersistence })} />
           <Slider label="Diffuse" value={liveConfig.trailDiffusion} {...liveSliderRanges.trailDiffusion} testId="trail-diffusion-slider" onChange={(trailDiffusion) => updateLiveConfig({ trailDiffusion })} />
           <Slider label="Pulse" value={liveConfig.pulseDepth} {...liveSliderRanges.pulseDepth} testId="pulse-depth-slider" onChange={(pulseDepth) => updateLiveConfig({ pulseDepth })} />
@@ -4040,27 +3749,27 @@ export function App() {
         />
 
         <div className="metrics-grid">
-          <Metric label={displayMode === "live" ? "Live Step" : "Density Sum"} value={displayMode === "live" ? String(liveDiagnostics?.timestep ?? "...") : metrics ? metrics.densitySum.toFixed(1) : "..."} />
-          <Metric label={displayMode === "live" ? "Voxels" : "Max Density"} value={displayMode === "live" ? String(liveDiagnostics?.voxelCount ?? liveConfig.width * liveConfig.height * liveConfig.depth) : metrics ? metrics.maxDensity.toFixed(3) : "..."} />
-          <Metric label="Ray Target" value={displayMode === "live" && liveDiagnostics ? `${liveDiagnostics.renderResolution[0]}x${liveDiagnostics.renderResolution[1]}` : `${controls.rayResolution}p`} />
-          <Metric label="Renderer" value={displayMode === "live" ? liveDiagnostics ? "Live 3D" : "..." : renderDiagnostics?.webgpu ? "WebGPU" : "..."} />
+          <Metric label="Live Step" value={String(liveDiagnostics?.timestep ?? "...")} />
+          <Metric label="Voxels" value={String(liveDiagnostics?.voxelCount ?? liveConfig.width * liveConfig.height * liveConfig.depth)} />
+          <Metric label="Render Target" value={liveDiagnostics ? `${liveDiagnostics.renderResolution[0]}x${liveDiagnostics.renderResolution[1]}` : `${controls.rayResolution}p`} />
+          <Metric label="Renderer" value={liveDiagnostics ? "Live 3D" : "..."} />
           <Metric label="GPU" value={webgpu.deviceOk ? "OK" : webgpu.checked ? "Fallback" : "..."} />
-          <Metric label={displayMode === "live" ? "Flow" : "3D Compute"} value={displayMode === "live" ? liveDiagnostics ? liveDiagnostics.fieldStats.flowSum.toFixed(2) : "..." : compute3d?.passed ? "OK" : "..."} />
-          <Metric label={displayMode === "live" ? "Frame ms" : "Field MAE"} value={displayMode === "live" ? liveDiagnostics ? liveDiagnostics.frameTimeMs.toFixed(1) : "..." : compute3d ? compute3d.fieldMeanAbsError.toFixed(4) : "..."} />
-          <Metric label="Tap" value={displayMode === "live" ? String(liveDiagnostics?.depositTaps ?? Math.pow(liveConfig.depositTapRadius * 2 + 1, 3)) : "..."} />
-          <Metric label="Voxel" value={displayMode === "live" ? (2 / liveConfig.width).toFixed(4) : "..."} />
-          <Metric label="Sigma" value={displayMode === "live" ? liveConfig.sigma.toFixed(4) : "..."} />
-          <Metric label="Trail Scale" value={displayMode === "live" ? liveDiagnostics ? liveDiagnostics.depositScale.toFixed(4) : "..." : "..."} />
-          <Metric label="GPU MB" value={displayMode === "live" ? liveDiagnostics ? ((liveDiagnostics.particleBufferBytes * 2 + liveDiagnostics.fieldBufferBytes * 3) / 1048576).toFixed(0) : "..." : "..."} />
+          <Metric label="Flow" value={liveDiagnostics ? liveDiagnostics.fieldStats.flowSum.toFixed(2) : "..."} />
+          <Metric label="Frame ms" value={liveDiagnostics ? liveDiagnostics.frameTimeMs.toFixed(1) : "..."} />
+          <Metric label="Tap" value={String(liveDiagnostics?.depositTaps ?? Math.pow(liveConfig.depositTapRadius * 2 + 1, 3))} />
+          <Metric label="Voxel" value={(2 / liveConfig.width).toFixed(4)} />
+          <Metric label="Sigma" value={liveConfig.sigma.toFixed(4)} />
+          <Metric label="Trail Scale" value={liveDiagnostics ? liveDiagnostics.depositScale.toFixed(4) : "..."} />
+          <Metric label="GPU MB" value={liveDiagnostics ? ((liveDiagnostics.particleBufferBytes * 2 + liveDiagnostics.fieldBufferBytes * 3) / 1048576).toFixed(0) : "..."} />
         </div>
         <details className="diagnostics-panel" open data-testid="status">
           <summary>Diagnostics</summary>
           <div className="status-list">
             <span>{webgpu.checked ? (webgpu.deviceOk ? "WebGPU verified" : "WebGPU fallback verified") : "Checking GPU"}</span>
             <span>{compute3d ? (compute3d.passed ? "3D compute verified" : "3D compute pending") : "3D compute checking"}</span>
-            <span>{displayMode === "live" ? `${liveDiagnostics?.particleCount ?? liveConfig.particleCount} live particles` : cloud ? `${cloud.points.length} cache points` : "loading cache"}</span>
-            <span>{displayMode === "live" ? (liveDiagnostics?.renderMode ?? "raymarch pending") : (renderDiagnostics?.renderer ?? "renderer pending")}</span>
-            <span>{displayMode === "live" ? (liveDiagnostics?.depositMode ?? "deposit pending") : "cache playback"}</span>
+            <span>{liveDiagnostics?.particleCount ?? liveConfig.particleCount} live particles</span>
+            <span>{liveDiagnostics?.renderMode ?? "particle renderer pending"}</span>
+            <span>{liveDiagnostics?.depositMode ?? "deposit pending"}</span>
             <span>frame {frame}</span>
           </div>
         </details>
@@ -4631,47 +4340,13 @@ function ControlGroup(props: { title: string; children: ReactNode }) {
   );
 }
 
-// Like ControlGroup but collapsible via native <details>, so heavier editors
-// (e.g. the Lighting Editor) can stay folded away until opened.
+// Like ControlGroup but collapsible via native <details> for less frequently used controls.
 function CollapsibleGroup(props: { title: string; testId?: string; defaultOpen?: boolean; children: ReactNode }) {
   return (
     <details className="control-group control-group-collapsible" data-testid={props.testId} open={props.defaultOpen}>
       <summary className="control-group-title">{props.title}</summary>
       {props.children}
     </details>
-  );
-}
-
-function Select(props: { label: string; value: RenderControls["palette"]; onChange: (value: RenderControls["palette"]) => void }) {
-  return (
-    <label className="control-row">
-      <span title={controlHint(props.label)}>{props.label}</span>
-      <select name={inputName(props.label)} value={props.value} onChange={(event) => props.onChange(event.target.value as RenderControls["palette"])}>
-        <option value="aurora">Aurora</option>
-        <option value="ember">Ember</option>
-        <option value="spectral">Spectral</option>
-      </select>
-      <output />
-    </label>
-  );
-}
-
-function LayerSelect(props: { displayMode: DisplayMode; value: RenderControls["renderLayer"]; onChange: (value: RenderControls["renderLayer"]) => void }) {
-  const value = renderLayerForDisplayMode(props.displayMode, props.value);
-  return (
-    <label className="control-row">
-      <span title={controlHint("Render")}>Render</span>
-      <select data-testid="render-layer-select" name="render-layer" value={value} onChange={(event) => props.onChange(event.target.value as RenderControls["renderLayer"])}>
-        <option value="both">Both</option>
-        <option value="particles">Particles</option>
-        <option value="density">Density</option>
-        {props.displayMode === "live" ? <option value="accumulation">Accumulation</option> : null}
-        {props.displayMode === "live" ? <option value="volume-density">Volume Density</option> : null}
-        <option value="trails">Trails</option>
-        <option value="debug-voxels">Debug Voxels</option>
-      </select>
-      <output />
-    </label>
   );
 }
 
@@ -4709,21 +4384,6 @@ function ParticleColorModeSelect(props: { value: RenderControls["particleColorMo
           <option value="gradient-ice">Gradient Ice</option>
           <option value="gradient-ember">Gradient Ember</option>
         </optgroup>
-      </select>
-      <output />
-    </label>
-  );
-}
-
-function TrailColorSelect(props: { value: RenderControls["trailColorMode"]; onChange: (value: RenderControls["trailColorMode"]) => void }) {
-  return (
-    <label className="control-row">
-      <span title={controlHint("Trail Color")}>Trail Color</span>
-      <select data-testid="trail-color-mode-select" name="trail-color-mode" value={props.value} onChange={(event) => props.onChange(event.target.value as RenderControls["trailColorMode"])}>
-        <option value="stable">Stable Density</option>
-        <option value="flow">Flow Hue</option>
-        <option value="thermal">Thermal</option>
-        <option value="tint">Tint</option>
       </select>
       <output />
     </label>
@@ -5110,10 +4770,6 @@ function liveVertexCount(diagnostics: LiveGpu3dDiagnostics | null, config: LiveG
   return particleCount * 4;
 }
 
-function cacheVertexCount(diagnostics: RenderDiagnostics | null, cloud: CacheCloud | null): number {
-  return diagnostics?.pointCount ?? cloud?.points.length ?? 0;
-}
-
 function formatCount(value: number): string {
   if (!Number.isFinite(value)) return "...";
   return Math.max(0, Math.round(value)).toLocaleString("en-US");
@@ -5384,8 +5040,7 @@ function settingsPresetFromUnknown(value: unknown, fallbackName: string): SavedS
   const presetId = typeof value.presetId === "string" && livePresets.some((preset) => preset.id === value.presetId)
     ? value.presetId
     : livePresets[0].id;
-  const rawDisplayMode = value.displayMode ?? value.mode;
-  const displayMode: DisplayMode = rawDisplayMode === "cache" ? "cache" : "live";
+  const displayMode: DisplayMode = "live";
   const controls = normalizeRenderControlsForDisplayMode(displayMode, sanitizeRenderControls(controlsSource));
   return {
     version: 2,
@@ -5602,7 +5257,7 @@ function sanitizeRenderControls(value: unknown): RenderControls {
     trailColorMode: parseTrailColorMode(typeof source.trailColorMode === "string" ? source.trailColorMode : null) ?? defaultControls.trailColorMode,
     fogTint: sanitizeHexColor(source.fogTint, defaultControls.fogTint),
     particleTint: sanitizeHexColor(source.particleTint, defaultControls.particleTint),
-    renderLayer: parseRenderLayer(typeof source.renderLayer === "string" ? source.renderLayer : null) ?? defaultControls.renderLayer,
+    renderLayer: "particles",
     palette,
     filament: clamp(finiteNumber(source.filament, defaultControls.filament), 0, 1),
     cameraYaw: finiteNumber(source.cameraYaw, defaultControls.cameraYaw),
@@ -5744,7 +5399,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function createInitialLiveState(): { presetId: string; config: LiveGpu3dConfig; controls: RenderControls } {
   const params = new URLSearchParams(window.location.search);
-  const displayMode: DisplayMode = params.get("mode") === "cache" ? "cache" : "live";
   const preset = getLivePreset(params.get("preset") ?? livePresets[0].id);
   const baseControls: RenderControls = { ...defaultControls, ...preset.renderControls };
   const particleCount = params.has("particles")
@@ -5758,7 +5412,6 @@ function createInitialLiveState(): { presetId: string; config: LiveGpu3dConfig; 
     : params.has("speed")
       ? clampSimulationSpeed(Number(params.get("speed")))
       : preset.config.simulationSpeed;
-  const renderLayer = parseRenderLayer(params.get("renderLayer")) ?? baseControls.renderLayer;
   const rayResolution = params.has("rayRes")
     ? clampRayResolution(Number(params.get("rayRes")))
     : baseControls.rayResolution;
@@ -5965,7 +5618,7 @@ function createInitialLiveState(): { presetId: string; config: LiveGpu3dConfig; 
     height: volumeSize,
     depth: volumeSize
   });
-  const controls = normalizeRenderControlsForDisplayMode(displayMode, {
+  const controls = normalizeRenderControlsForDisplayMode("live", {
     ...baseControls,
     ...probeControls,
     rayResolution,
@@ -6040,7 +5693,7 @@ function createInitialLiveState(): { presetId: string; config: LiveGpu3dConfig; 
     accumulationCurve,
     accumulationMemory,
     accumulationNoiseReject,
-    renderLayer
+    renderLayer: "particles"
   });
   return {
     presetId: preset.id,
@@ -6049,18 +5702,9 @@ function createInitialLiveState(): { presetId: string; config: LiveGpu3dConfig; 
   };
 }
 
-function parseRenderLayer(value: string | null): RenderControls["renderLayer"] | null {
-  if (value === "both" || value === "particles" || value === "trails" || value === "density" || value === "volume-density" || value === "accumulation" || value === "debug-voxels") return value;
-  return null;
-}
-
-function renderLayerForDisplayMode(displayMode: DisplayMode, renderLayer: RenderControls["renderLayer"]): RenderControls["renderLayer"] {
-  return displayMode === "cache" && (renderLayer === "volume-density" || renderLayer === "accumulation") ? "both" : renderLayer;
-}
-
-function normalizeRenderControlsForDisplayMode(displayMode: DisplayMode, controls: RenderControls): RenderControls {
-  const renderLayer = renderLayerForDisplayMode(displayMode, controls.renderLayer);
-  return renderLayer === controls.renderLayer ? controls : { ...controls, renderLayer };
+function normalizeRenderControlsForDisplayMode(_displayMode: DisplayMode, controls: RenderControls): RenderControls {
+  if (controls.renderLayer === "particles" && controls.ribbonFraction === 0) return controls;
+  return { ...controls, renderLayer: "particles", ribbonFraction: 0 };
 }
 
 function shouldEnableGpuProfiling(params: URLSearchParams): boolean {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
-import type { RenderControls } from "./cacheRenderer";
+import type { RenderControls } from "./renderControls";
 import {
   defaultLiveGpu3dConfig,
   type LiveGpu3dConfig,

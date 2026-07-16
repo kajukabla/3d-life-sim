@@ -1,4 +1,4 @@
-import type { ParticleColorMode } from "./cacheRenderer";
+import type { ParticleColorMode } from "./renderControls";
 
 export type RGB = [number, number, number];
 

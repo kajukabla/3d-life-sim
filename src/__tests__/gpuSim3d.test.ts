@@ -132,9 +132,9 @@ describe("3D WebGPU compute reference", () => {
     expect(splatRadiusBody).not.toContain("particle_min_px");
     expect(splatRadiusBody).not.toContain("particle_max_px");
     expect(splatRadiusBody).not.toContain("clamp(");
-    expect(appSource).toContain('{displayMode === "cache" && (');
-    expect(appSource).toContain('<Slider label="P Min Px"');
-    expect(appSource).toContain('<Slider label="P Max Px"');
+    expect(appSource).not.toContain('displayMode === "cache"');
+    expect(appSource).not.toContain('<Slider label="P Min Px"');
+    expect(appSource).not.toContain('<Slider label="P Max Px"');
     // Particles at/behind the camera are clipped, not pinned to the viewport.
     expect(source).toContain("if (view_depth <= PARTICLE_NEAR) {");
     expect(source).toContain("let inv_depth = 1.0 / max(PARTICLE_NEAR, uniforms.distance + camera.z);");
@@ -174,7 +174,7 @@ describe("3D WebGPU compute reference", () => {
   it("wires the per-particle variation + fractal noise system end to end", () => {
     const source = readFileSync(new URL("../realtimeGpuSim3d.ts", import.meta.url), "utf8");
     const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
-    const cacheSource = readFileSync(new URL("../cacheRenderer.ts", import.meta.url), "utf8");
+    const controlsSource = readFileSync(new URL("../renderControls.ts", import.meta.url), "utf8");
 
     // Uniform buffer holds the variation block (88..111), domainShape (112), audio (113..115),
     // the color cross-fade fields (116..117), render-optimization toggles (118 = cutoff
@@ -215,8 +215,8 @@ describe("3D WebGPU compute reference", () => {
     expect(particleShader).toContain("let varied_hue = fract(particle_gradient_coordinate(visual_velocity, base_gradient) + variation.hue_off);");
 
     // Controls exist on the type, default to a no-op, and surface in the Variation panel.
-    expect(cacheSource).toContain("variationMaster: number;");
-    expect(cacheSource).toContain("variationColorMax: number;");
+    expect(controlsSource).toContain("variationMaster: number;");
+    expect(controlsSource).toContain("variationColorMax: number;");
     expect(appSource).toContain("variationMaster: 1,");
     expect(appSource).toContain('<ControlGroup title="Variation">');
     expect(appSource).toContain('<Slider label="Var Master"');
@@ -652,12 +652,12 @@ describe("3D WebGPU compute reference", () => {
     expect(source).toContain("this.drawDensitySplatPass(encoder, this.densityLargePipeline!, this.densityLargeTexture!, timestampBase !== undefined ? timestampBase + 2 : undefined, fieldBuffer);");
     expect(source).toContain("timestampWrites: this.timestampWrites(timestampBase + 4, timestampBase + 5)");
 
-    expect(appSource).toContain('testId="density-small-scale-slider"');
-    expect(appSource).toContain('<option value="density">Density</option>');
-    expect(appSource).toContain('testId="density-large-scale-slider"');
-    expect(appSource).toContain('testId="density-contrast-gain-slider"');
-    expect(appSource).toContain('testId="density-emission-power-slider"');
-    expect(appSource).toContain('testId="density-occlusion-slider"');
+    expect(appSource).not.toContain('testId="density-small-scale-slider"');
+    expect(appSource).not.toContain('<option value="density">Density</option>');
+    expect(appSource).not.toContain('testId="density-large-scale-slider"');
+    expect(appSource).not.toContain('testId="density-contrast-gain-slider"');
+    expect(appSource).not.toContain('testId="density-emission-power-slider"');
+    expect(appSource).not.toContain('testId="density-occlusion-slider"');
   });
 
   it("renders a color-preserving 3D volume-density mode before bloom", () => {
@@ -732,10 +732,9 @@ describe("3D WebGPU compute reference", () => {
     expect(source).toContain('controls.renderLayer === "volume-density" ? "volume-density-raymarch"');
     expect(source.indexOf("this.renderVolumeDensityLayer(")).toBeLessThan(source.indexOf("const bloomEnabled = controls.bloomStrength > 0.0001;"));
 
-    expect(appSource).toContain('<option value="volume-density">Volume Density</option>');
-    expect(appSource).toContain('value === "volume-density"');
-    expect(appSource).toContain('renderLayerForDisplayMode(displayMode: DisplayMode, renderLayer: RenderControls["renderLayer"])');
-    expect(appSource).toContain('return displayMode === "cache" && (renderLayer === "volume-density" || renderLayer === "accumulation") ? "both" : renderLayer;');
+    expect(appSource).not.toContain('<option value="volume-density">Volume Density</option>');
+    expect(appSource).not.toContain('function renderLayerForDisplayMode');
+    expect(appSource).toContain('return { ...controls, renderLayer: "particles", ribbonFraction: 0 };');
     expect(appSource).toContain("function liveWebGpuConformance(live: LiveGpu3dDiagnostics | null): boolean");
     expect(appSource).toContain('live.renderMode === "volume-density-raymarch"');
     expect(appSource).toContain('const fieldStatsOk = live.renderMode === "particle-splats" || live.fieldStats.nonzeroVoxels > 0;');
@@ -794,23 +793,23 @@ describe("3D WebGPU compute reference", () => {
     expect(source).toContain("accumulationComposite: liveAccumulationCompositeShader");
     expect(source.indexOf("this.renderAccumulationLayer(")).toBeLessThan(source.indexOf("const bloomEnabled = controls.bloomStrength > 0.0001;"));
 
-    expect(appSource).toContain('<option value="accumulation">Accumulation</option>');
-    expect(appSource).toContain('testId="accumulation-strength-slider"');
-    expect(appSource).toContain('testId="accumulation-radius-slider"');
-    expect(appSource).toContain('testId="accumulation-curve-slider"');
-    expect(appSource).toContain('testId="accumulation-memory-slider"');
-    expect(appSource).toContain('testId="accumulation-noise-reject-slider"');
+    expect(appSource).not.toContain('<option value="accumulation">Accumulation</option>');
+    expect(appSource).not.toContain('testId="accumulation-strength-slider"');
+    expect(appSource).not.toContain('testId="accumulation-radius-slider"');
+    expect(appSource).not.toContain('testId="accumulation-curve-slider"');
+    expect(appSource).not.toContain('testId="accumulation-memory-slider"');
+    expect(appSource).not.toContain('testId="accumulation-noise-reject-slider"');
     expect(appSource).toContain('const accumulationStrength = params.has("accumulationStrength")');
     expect(appSource).toContain('const accumulationNoiseReject = params.has("accumulationReject")');
   });
 
   it("restores every render control and live config knob through settings JSON and full capture manifests", () => {
     const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
-    const cacheSource = readFileSync(new URL("../cacheRenderer.ts", import.meta.url), "utf8");
+    const controlsSource = readFileSync(new URL("../renderControls.ts", import.meta.url), "utf8");
     const liveSource = readFileSync(new URL("../realtimeGpuSim3d.ts", import.meta.url), "utf8");
-    const controlsType = cacheSource.slice(
-      cacheSource.indexOf("export type RenderControls = {"),
-      cacheSource.indexOf("};", cacheSource.indexOf("export type RenderControls = {"))
+    const controlsType = controlsSource.slice(
+      controlsSource.indexOf("export type RenderControls = {"),
+      controlsSource.indexOf("};", controlsSource.indexOf("export type RenderControls = {"))
     );
     const liveConfigType = liveSource.slice(
       liveSource.indexOf("export type LiveGpu3dConfig = {"),
@@ -829,6 +828,10 @@ describe("3D WebGPU compute reference", () => {
 
     expect(controlKeys.length).toBeGreaterThan(0);
     for (const key of controlKeys) {
+      if (key === "renderLayer") {
+        expect(sanitizer).toContain('renderLayer: "particles"');
+        continue;
+      }
       expect(sanitizer, `sanitizeRenderControls should preserve ${key}`).toContain(`source.${key}`);
     }
     expect(liveConfigKeys.length).toBeGreaterThan(0);
@@ -840,7 +843,7 @@ describe("3D WebGPU compute reference", () => {
     expect(appSource).toContain("controls: normalizedControls");
     expect(appSource).toContain("renderControlsWithModulationRangeOverrides(sanitizeRenderControls(controls), controls, currentSavedAudio.sliders)");
     expect(appSource).toContain("liveConfig: sanitizeLiveConfig(liveConfig)");
-    expect(appSource).toContain("const rawDisplayMode = value.displayMode ?? value.mode;");
+    expect(appSource).toContain('const displayMode: DisplayMode = "live";');
     expect(appSource).toContain("renderControls: sanitizeRenderControls(rendered)");
     expect(appSource).toContain('const bloomStrength = params.has("bloom")');
     expect(appSource).toContain('const bloomThreshold = params.has("bloomThreshold")');
@@ -849,7 +852,6 @@ describe("3D WebGPU compute reference", () => {
 
   it("requests HDR canvas output without rendering a viewport frame-rate HUD", () => {
     const realtimeSource = readFileSync(new URL("../realtimeGpuSim3d.ts", import.meta.url), "utf8");
-    const cacheSource = readFileSync(new URL("../cacheRenderer.ts", import.meta.url), "utf8");
     const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
     const styles = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 
@@ -858,7 +860,6 @@ describe("3D WebGPU compute reference", () => {
     expect(hdrCanvasToneMappingMode).toBe("extended");
     expect(wideGamut2dSettings).toEqual({ alpha: false, colorSpace: "display-p3" });
     expect(realtimeSource).toContain("configureHdrWebGpuCanvas(this.context, this.device)");
-    expect(cacheSource).toContain("configureHdrWebGpuCanvas(context, device)");
     expect(appSource).not.toContain("viewport-hud");
     expect(appSource).not.toContain("fps-counter");
     expect(appSource).not.toContain("parseParticleColorMode");

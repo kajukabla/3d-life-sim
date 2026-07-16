@@ -27,7 +27,7 @@ Useful shortcuts:
 - `M` — hide or show the cockpit
 - `R` — start or stop a performance recording
 
-Browser microphone analysis is opt-in with `?audio=mic`. Philips Hue and WebSocket audio controls are also opt-in and accept loopback connections only. The normal simulation does not contact a backend and needs no API keys.
+Browser microphone analysis is opt-in with `?audio=mic`. WebSocket audio input is also opt-in and accepts loopback connections only. The normal simulation does not contact a backend and needs no API keys.
 
 ## Development
 
@@ -47,7 +47,7 @@ pnpm deploy
 
 ## Project scope
 
-This repository contains only the browser simulation and its tests. Native helpers, offline render tools, generated captures, private development notes, and the original monorepo history are intentionally excluded.
+This repository contains the browser simulation, a particle-only public render path, three curated particle presets (`vid1`, `vid2`, and `AR11`), and its tests. The copied presets contain no MIDI mappings. Cache playback, alternate render-mode controls and presets, Philips Hue integration, native helpers, offline render tools, generated captures, private development notes, and the original monorepo history are intentionally excluded.
 
 ## License and attribution
 

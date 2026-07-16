@@ -1,6 +1,5 @@
 import { defaultLiveGpu3dConfig, LiveGpu3dConfig } from "./realtimeGpuSim3d";
-import type { RenderControls } from "./cacheRenderer";
-import type { AudioReactiveMapping } from "./audioReactive";
+import type { RenderControls } from "./renderControls";
 export { liveParticleStep, maxLiveParticles, minLiveParticles } from "./particleLimits";
 
 export type LivePreset = {
@@ -9,7 +8,6 @@ export type LivePreset = {
   source: string;
   config: LiveGpu3dConfig;
   renderControls?: Partial<RenderControls>;
-  audioMapping?: AudioReactiveMapping;
 };
 
 const anglesRule = [
@@ -75,28 +73,6 @@ function presetConfig(config: Partial<LiveGpu3dConfig> & Pick<LiveGpu3dConfig, "
     depth: presetVolumeSize
   };
 }
-
-const volumeTendrilsAudioMapping: AudioReactiveMapping = {
-  id: "volume-tendrils-audio",
-  rules: [
-    { source: "low", target: "render.densityPassStrength", range: [3.8, 7.8], curve: 1.25 },
-    { source: "low", target: "render.bloomStrength", range: [0.45, 1.25], curve: 1.35 },
-    { source: "low", target: "live.depositMass", range: [0.62, 1.9], curve: 1.2 },
-    { source: "mid", target: "live.sensorGain", range: [1.2, 3.6], curve: 1.15 },
-    { source: "high", target: "render.particleBrightness", range: [0.85, 2.15], curve: 1.45 }
-  ]
-};
-
-const filamentBloomAudioMapping: AudioReactiveMapping = {
-  id: "volume-filament-bloom-audio",
-  rules: [
-    { source: "low", target: "render.densityContrastGain", range: [11, 18], curve: 1.15 },
-    { source: "low", target: "render.bloomStrength", range: [0.25, 1.05], curve: 1.5 },
-    { source: "low", target: "live.depositMass", range: [0.5, 1.65], curve: 1.35 },
-    { source: "high", target: "render.densityEmissionPower", range: [2.15, 3.2], curve: 1.2 },
-    { source: "high", target: "render.particleBrightness", range: [0.7, 2.35], curve: 1.25 }
-  ]
-};
 
 export const livePresets: LivePreset[] = [
   {
@@ -245,175 +221,6 @@ export const livePresets: LivePreset[] = [
       boundaryMode: 2,
       rule: anglesRule
     })
-  },
-  {
-    id: "volume-tendrils",
-    name: "Volume Tendrils",
-    source: "3d-life-sim/built-in/volume-tendrils",
-    config: presetConfig({
-      axialForce: 0.022,
-      lateralForce: -0.186,
-      sensorGain: 1.369,
-      mutationScale: 0.095,
-      drag: 0.125,
-      strafePower: 0.169,
-      sensorAngle: -0.141,
-      globalForceMult: 0.94,
-      sensorDistance: 1.013,
-      trailPersistence: 0.943,
-      trailDiffusion: 1,
-      cohorts: 6,
-      ruleSeed: 0.6633918167,
-      hueSensitivity: 0.25,
-      colorByCohort: true,
-      symmetryAxes: 2,
-      absoluteOrientation: 1,
-      orientationMix: 0,
-      initialConditions: 1,
-      boundaryMode: 2,
-      particleCount: 262144,
-      width: 96,
-      height: 96,
-      depth: 96,
-      rule: anglesRule
-    }),
-    renderControls: {
-      renderLayer: "volume-density",
-      particleColorMode: "gradient-turbo",
-      particleTint: "#ffffff",
-      particleOpacity: 0.42,
-      particleDensityCutoff: 0.002,
-      particleDensityRadius: 0.04,
-      densityPassStrength: 4.2,
-      densitySmallScale: 2.2,
-      densityLargeScale: 12,
-      densityLargeThreshold: 0.18,
-      densityContrastGain: 9,
-      densityContrastBalance: 0.7,
-      densityEmissionPower: 2.4,
-      densityOcclusion: 0.35,
-      raySteps: 64,
-      rayResolution: 2160,
-      fogStepScale: 0.6,
-      emptySpaceSkipping: true,
-      emptySpaceThreshold: 0.035,
-      emptySpaceStride: 4,
-      bloomStrength: 0.8,
-      bloomThreshold: 0.2,
-      bloomRadius: 2.2
-    },
-    audioMapping: volumeTendrilsAudioMapping
-  },
-  {
-    id: "volume-filament-bloom",
-    name: "Volume Filament Bloom",
-    source: "3d-life-sim/built-in/volume-filament-bloom",
-    config: presetConfig({
-      axialForce: 0.022,
-      lateralForce: -0.186,
-      sensorGain: 1.369,
-      mutationScale: 0.095,
-      drag: 0.125,
-      strafePower: 0.169,
-      sensorAngle: -0.141,
-      globalForceMult: 0.94,
-      sensorDistance: 1.013,
-      trailPersistence: 0.943,
-      trailDiffusion: 1,
-      cohorts: 6,
-      ruleSeed: 0.6633918167,
-      hueSensitivity: 0.25,
-      colorByCohort: true,
-      symmetryAxes: 2,
-      absoluteOrientation: 1,
-      orientationMix: 0,
-      initialConditions: 1,
-      boundaryMode: 2,
-      particleCount: 262144,
-      width: 96,
-      height: 96,
-      depth: 96,
-      rule: anglesRule
-    }),
-    renderControls: {
-      renderLayer: "volume-density",
-      particleColorMode: "gradient-rainbow",
-      particleTint: "#ffffff",
-      particleBrightness: 0.82,
-      particleOpacity: 0.14,
-      particleDensityCutoff: 0.0012,
-      particleDensityRadius: 0.04,
-      densityPassStrength: 5.8,
-      densitySmallScale: 0.75,
-      densityLargeScale: 5.2,
-      densityLargeThreshold: 0.15,
-      densityContrastGain: 12.5,
-      densityContrastBalance: 1.05,
-      densityEmissionPower: 2.05,
-      densityOcclusion: 0.12,
-      raySteps: 64,
-      rayResolution: 2160,
-      fogStepScale: 0.52,
-      emptySpaceSkipping: true,
-      emptySpaceThreshold: 0.035,
-      emptySpaceStride: 4,
-      bloomStrength: 0.18,
-      bloomThreshold: 0.72,
-      bloomRadius: 1.05
-    },
-    audioMapping: filamentBloomAudioMapping
-  },
-  {
-    id: "accumulation-filaments",
-    name: "Accumulation Filaments",
-    source: "3d-life-sim/built-in/accumulation-filaments",
-    config: presetConfig({
-      axialForce: 0.022,
-      lateralForce: -0.186,
-      sensorGain: 1.369,
-      mutationScale: 0.095,
-      drag: 0.125,
-      strafePower: 0.169,
-      sensorAngle: -0.141,
-      globalForceMult: 0.94,
-      sensorDistance: 1.013,
-      trailPersistence: 0.943,
-      trailDiffusion: 1,
-      cohorts: 6,
-      ruleSeed: 0.6633918167,
-      hueSensitivity: 0.25,
-      colorByCohort: true,
-      symmetryAxes: 2,
-      absoluteOrientation: 1,
-      orientationMix: 0,
-      initialConditions: 1,
-      boundaryMode: 2,
-      particleCount: 262144,
-      width: 96,
-      height: 96,
-      depth: 96,
-      rule: anglesRule
-    }),
-    renderControls: {
-      renderLayer: "accumulation",
-      particleColorMode: "gradient-rainbow",
-      particleTint: "#ffffff",
-      particleBrightness: 1.4,
-      particleOpacity: 0.2,
-      particleDensityCutoff: 0.0085,
-      particleDensityRadius: 0.046,
-      accumulationStrength: 12,
-      accumulationRadius: 0.86,
-      accumulationCurve: 5,
-      accumulationMemory: 0.88,
-      accumulationNoiseReject: 0.82,
-      raySteps: 64,
-      rayResolution: 2160,
-      bloomStrength: 0.42,
-      bloomThreshold: 0.55,
-      bloomRadius: 1.1,
-      filament: 1
-    }
   },
   {
     id: "circuits",
