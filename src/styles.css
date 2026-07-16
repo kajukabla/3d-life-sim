@@ -19,8 +19,7 @@ body {
 
 button,
 input,
-select,
-textarea {
+select {
   font: inherit;
 }
 
@@ -809,80 +808,6 @@ button.active {
   border-radius: 2px;
 }
 
-.metrics-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 16px 0;
-}
-
-.metrics-grid div {
-  min-height: 54px;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.035);
-}
-
-.metrics-grid span {
-  display: block;
-  color: #aeb6b2;
-  font-size: 11px;
-}
-
-.metrics-grid strong {
-  display: block;
-  margin-top: 5px;
-  color: #f3efe7;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-
-.diagnostics-panel,
-.preset-json {
-  margin-top: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.diagnostics-panel summary,
-.preset-json summary {
-  min-height: 34px;
-  padding: 8px 10px;
-  color: #efe5d4;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.status-list {
-  display: grid;
-  gap: 7px;
-  padding: 0 10px 10px;
-}
-
-.status-list span {
-  display: block;
-  color: #bbc8c4;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-textarea {
-  width: calc(100% - 20px);
-  min-height: 160px;
-  margin: 0 10px 10px;
-  resize: vertical;
-  color: #d8d3c8;
-  background: #090d0f;
-  border: 1px solid #2c3a3e;
-  border-radius: 6px;
-  padding: 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.45;
-}
 
 .sim-speed-lab {
   min-height: 100vh;
