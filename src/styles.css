@@ -677,16 +677,22 @@ button.active {
   font-size: 11px;
 }
 
-.audio-meter div {
+.audio-meter progress {
+  appearance: none;
+  width: 100%;
   height: 7px;
   overflow: hidden;
+  border: 0;
   background: rgba(255, 255, 255, 0.09);
   border-radius: 3px;
 }
 
-.audio-meter i {
-  display: block;
-  height: 100%;
+.audio-meter progress::-webkit-progress-bar {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.audio-meter progress::-webkit-progress-value,
+.audio-meter progress::-moz-progress-bar {
   background: #aadfd3;
 }
 

@@ -3,6 +3,8 @@ import {
   applyAudioReactiveFrame,
   connectAudioReactiveSocket,
   defaultAudioReactiveMapping,
+  maxAudioBands,
+  maxAudioDevices,
   normalizeAudioSignal,
   parseAudioAnalysisFrame,
   parseAudioBackendMessage,
@@ -126,6 +128,46 @@ describe("audio reactive mapping", () => {
     expect(message.devices).toHaveLength(2);
     expect(message.devices[0].channels).toBe(32);
     expect(parseAudioAnalysisFrame(message)).toBe(null);
+  });
+
+  it("bounds arrays and maps supplied by the loopback helper", () => {
+    const parsedFrame = parseAudioAnalysisFrame({
+      version: 1,
+      sequence: 1,
+      timestampSec: 1,
+      sampleRate: 48_000,
+      rms: 0.5,
+      peak: 0.5,
+      bands: Object.fromEntries(Array.from({ length: maxAudioBands + 20 }, (_, index) => [
+        `band-${index}`,
+        { value: 0.5 }
+      ]))
+    });
+    const parsedDevices = parseAudioBackendMessage({
+      type: "audioDevices",
+      activeInput: null,
+      devices: Array.from({ length: maxAudioDevices + 20 }, (_, index) => ({
+        id: `device-${index}`,
+        name: `Device ${index}`
+      }))
+    });
+
+    expect(Object.keys(parsedFrame?.bands ?? {})).toHaveLength(maxAudioBands);
+    expect(parsedDevices?.type).toBe("audioDevices");
+    if (parsedDevices?.type !== "audioDevices") throw new Error("expected devices message");
+    expect(parsedDevices.devices).toHaveLength(maxAudioDevices);
+
+    const prototypeKeyFrame = parseAudioAnalysisFrame(JSON.parse(`{
+      "version": 1,
+      "sequence": 1,
+      "timestampSec": 1,
+      "sampleRate": 48000,
+      "rms": 0.5,
+      "peak": 0.5,
+      "bands": { "__proto__": { "value": 0.75 } }
+    }`));
+    expect(Object.getPrototypeOf(prototypeKeyFrame?.bands)).toBe(null);
+    expect(prototypeKeyFrame?.bands["__proto__"]?.value).toBe(0.75);
   });
 
   it("requests devices and sends input switch commands over the socket", () => {

@@ -41,6 +41,7 @@ import { useTimelineTransport } from "./useTimelineTransport";
 import { createCameraRecorder, type CameraPose } from "./cameraRecorder";
 import { audioMicFromLaunch, audioReactiveUrlFromLaunch, chooseBootSettingsId, demoLaunchFromSearch, embedFromLaunch, parallelPipelinesFromLaunch, shouldStartPlaying } from "./launchOptions";
 import { curatedPresetIds, defaultCuratedPresetId } from "./curatedPresets";
+import { readPresetJsonFile, sanitizePresetName } from "./presetFiles";
 import { startMicAudio, type MicAudioStatus, type MicAudioController } from "./micAudio";
 import {
   connectAudioReactiveSocket,
@@ -2875,7 +2876,7 @@ export function App() {
   }, [controls, currentSavedAudio, currentSavedUi, displayMode, liveConfig, savedSettings, selectedPresetId, selectedSettingsId]);
 
   const importSettingsFile = useCallback(async (file: File) => {
-    const imported = settingsPresetFromJson(await file.text(), settingsNameFromFileName(file.name));
+    const imported = settingsPresetFromJson(await readPresetJsonFile(file), settingsNameFromFileName(file.name));
     applySettingsPreset(imported);
   }, [applySettingsPreset]);
 
@@ -3625,7 +3626,7 @@ function AudioPanel(props: {
         {audioBuckets.map((bucket) => (
           <div key={bucket} className="audio-meter" data-testid={`audio-meter-${bucket}`}>
             <span>{bucket}</span>
-            <div><i style={{ width: `${Math.round(props.meters[bucket] * 100)}%` }} /></div>
+            <progress max={1} value={props.meters[bucket]} aria-label={`${bucket} level`} />
             <strong>{props.meters[bucket].toFixed(2)}</strong>
           </div>
         ))}
@@ -4519,7 +4520,7 @@ function buildSavedSettingsPreset(
   return {
     version: 2,
     id: existing?.id ?? makeSettingsId(),
-    name,
+    name: sanitizePresetName(name, "Preset"),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
     presetId,
@@ -4704,7 +4705,7 @@ function settingsPresetFromUnknown(value: unknown, fallbackName: string): SavedS
         : null;
   if (!liveSource) return null;
   const now = new Date().toISOString();
-  const name = typeof value.name === "string" && value.name.trim() ? value.name.trim() : fallbackName || "Imported";
+  const name = sanitizePresetName(value.name, fallbackName);
   const presetId = typeof value.presetId === "string" && livePresets.some((preset) => preset.id === value.presetId)
     ? value.presetId
     : livePresets[0].id;

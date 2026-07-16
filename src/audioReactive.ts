@@ -84,6 +84,12 @@ export type AudioReactiveSocketController = {
 
 export type AudioReactiveMappingSource = AudioReactiveMapping | (() => AudioReactiveMapping);
 
+export const maxAudioBands = 64;
+export const maxAudioDevices = 64;
+export const maxAudioSocketMessageChars = 256 * 1024;
+const maxAudioLabelChars = 256;
+const maxAudioErrorChars = 512;
+
 export const defaultAudioReactiveMapping: AudioReactiveMapping = {
   id: "fluoddity-default-low-mid-high",
   rules: [
@@ -106,15 +112,21 @@ export function parseAudioAnalysisFrame(value: unknown): AudioAnalysisFrame | nu
   if (version !== 1 || !Number.isFinite(sequence) || !Number.isFinite(timestampSec) || !Number.isFinite(sampleRate)) {
     return null;
   }
-  const bands: Record<string, AudioBandFrame> = {};
+  const bands = Object.create(null) as Record<string, AudioBandFrame>;
   if (isRecord(value.bands)) {
-    for (const [name, bandValue] of Object.entries(value.bands)) {
+    let bandCount = 0;
+    for (const name of Object.keys(value.bands)) {
+      if (bandCount >= maxAudioBands) break;
+      const bandValue = value.bands[name];
       if (!isRecord(bandValue)) continue;
-      bands[name] = {
+      const boundedName = boundedText(name, maxAudioLabelChars);
+      if (!boundedName) continue;
+      bands[boundedName] = {
         value: unit(finiteNumber(bandValue.value, 0)),
         rawDb: optionalFiniteNumber(bandValue.rawDb),
         rawMagnitude: optionalFiniteNumber(bandValue.rawMagnitude)
       };
+      bandCount += 1;
     }
   }
   return {
@@ -135,14 +147,18 @@ export function parseAudioBackendMessage(value: unknown): AudioBackendMessage | 
   if (value.type === "audioDevices") {
     return {
       type: "audioDevices",
-      activeInput: typeof value.activeInput === "string" ? value.activeInput : null,
-      devices: Array.isArray(value.devices) ? value.devices.map(parseAudioInputDevice).filter((device): device is AudioInputDeviceInfo => !!device) : []
+      activeInput: typeof value.activeInput === "string" ? boundedText(value.activeInput, maxAudioLabelChars) || null : null,
+      devices: Array.isArray(value.devices)
+        ? value.devices.slice(0, maxAudioDevices).map(parseAudioInputDevice).filter((device): device is AudioInputDeviceInfo => !!device)
+        : []
     };
   }
   if (value.type === "audioBackendError") {
     return {
       type: "audioBackendError",
-      message: typeof value.message === "string" ? value.message : "Audio backend error"
+      message: typeof value.message === "string"
+        ? boundedText(value.message, maxAudioErrorChars) || "Audio backend error"
+        : "Audio backend error"
     };
   }
   return null;
@@ -220,6 +236,7 @@ export function connectAudioReactiveSocket(options: {
   socket.addEventListener("error", () => emitStatus(false));
   socket.addEventListener("message", (event) => {
     const payload = typeof event.data === "string" ? event.data : "";
+    if (!payload || payload.length > maxAudioSocketMessageChars) return;
     let json: unknown;
     try {
       json = JSON.parse(payload);
@@ -257,7 +274,10 @@ export function connectAudioReactiveSocket(options: {
       socket.close();
     },
     requestDevices: () => sendCommand({ type: "listDevices" }),
-    setInput: (input: string) => sendCommand({ type: "setInput", input }),
+    setInput: (input: string) => {
+      const boundedInput = boundedText(input, maxAudioLabelChars);
+      if (boundedInput) sendCommand({ type: "setInput", input: boundedInput });
+    },
     status: () => ({
       connected: !closed && socket.readyState === WebSocket.OPEN,
       frameCount,
@@ -269,9 +289,9 @@ export function connectAudioReactiveSocket(options: {
 
 function parseAudioInputDevice(value: unknown): AudioInputDeviceInfo | null {
   if (!isRecord(value)) return null;
-  const name = typeof value.name === "string" ? value.name : "";
+  const name = typeof value.name === "string" ? boundedText(value.name, maxAudioLabelChars) : "";
   if (!name) return null;
-  const id = typeof value.id === "string" && value.id ? value.id : name;
+  const id = typeof value.id === "string" ? boundedText(value.id, maxAudioLabelChars) || name : name;
   const channels = optionalFiniteNumber(value.channels);
   const sampleRate = optionalFiniteNumber(value.sampleRate);
   return {
@@ -280,8 +300,8 @@ function parseAudioInputDevice(value: unknown): AudioInputDeviceInfo | null {
     isDefault: value.isDefault === true,
     channels: channels === undefined ? undefined : Math.max(0, Math.round(channels)),
     sampleRate: sampleRate === undefined ? undefined : Math.max(0, Math.round(sampleRate)),
-    sampleFormat: typeof value.sampleFormat === "string" ? value.sampleFormat : undefined,
-    error: typeof value.error === "string" ? value.error : undefined
+    sampleFormat: typeof value.sampleFormat === "string" ? boundedText(value.sampleFormat, 32) || undefined : undefined,
+    error: typeof value.error === "string" ? boundedText(value.error, maxAudioErrorChars) || undefined : undefined
   };
 }
 
@@ -331,6 +351,15 @@ function finiteNumber(value: unknown, fallback: number): number {
 function optionalFiniteNumber(value: unknown): number | undefined {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : undefined;
+}
+
+function boundedText(value: string, maxChars: number): string {
+  return Array.from(value)
+    .slice(0, maxChars)
+    .join("")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function legacyBandFallback(source: string): string {

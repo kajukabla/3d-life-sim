@@ -9,7 +9,9 @@
     "build": "tsc -b && vite build",
     "lint": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "pnpm build && playwright test",
     "check": "pnpm lint && pnpm test && pnpm build",
+    "check:all": "pnpm check && playwright test",
     "deploy": "pnpm build && wrangler pages deploy"
   },
   "dependencies": {
@@ -17,6 +19,7 @@
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.1",
     "@types/node": "25.9.1",
     "@types/react": "19.2.15",
     "@types/react-dom": "19.2.3",
