@@ -12,21 +12,21 @@
     "test:e2e": "pnpm build && playwright test",
     "check": "pnpm lint && pnpm test && pnpm build",
     "check:all": "pnpm check && playwright test",
-    "deploy": "pnpm build && wrangler pages deploy"
+    "deploy": "pnpm build && wrangler pages deploy && node scripts/verifyDeployedHeaders.mjs"
   },
   "dependencies": {
-    "react": "19.2.6",
+    "react": "19.2.7",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",
-    "@types/node": "25.9.1",
-    "@types/react": "19.2.15",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "@webgpu/types": "0.1.70",
+    "@vitejs/plugin-react": "6.0.3",
+    "@webgpu/types": "0.1.71",
     "typescript": "6.0.3",
-    "vite": "8.0.16",
+    "vite": "8.1.4",
     "vitest": "4.1.7",
     "wrangler": "4.111.0"
   },

@@ -538,7 +538,10 @@ describe("3D WebGPU compute reference", () => {
     const source = readFileSync(new URL("../realtimeGpuSim3d.ts", import.meta.url), "utf8");
     const limits = readFileSync(new URL("../particleLimits.ts", import.meta.url), "utf8");
 
-    expect(limits).toContain("Number.MAX_SAFE_INTEGER");
+    // The ceiling sanitizes untrusted input (URL params, imported presets); it is not a
+    // device-limit workaround — chunking still splits storage buffers below it.
+    expect(limits).toContain("export const maxLiveParticles = 8388608;");
+    expect(limits).not.toContain("Number.MAX_SAFE_INTEGER");
     expect(source).toContain("type ParticleBufferChunk");
     expect(source).toContain("private particleChunks: ParticleBufferChunk[] = []");
     expect(source).toContain("function maxParticlesPerStorageBuffer");

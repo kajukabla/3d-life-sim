@@ -5,7 +5,7 @@ import { SimSpeedDebugLab } from "./SimSpeedDebugLab";
 import "./styles.css";
 
 const searchParams = new URLSearchParams(window.location.search);
-const Root = searchParams.get("simSpeedLab") === "1" ? SimSpeedDebugLab : App;
+const Root = import.meta.env.DEV && searchParams.get("simSpeedLab") === "1" ? SimSpeedDebugLab : App;
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

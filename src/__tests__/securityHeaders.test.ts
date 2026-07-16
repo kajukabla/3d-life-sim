@@ -15,7 +15,8 @@ describe("static deployment security headers", () => {
       "img-src 'self' data:",
       "connect-src 'self'",
       "object-src 'none'",
-      "base-uri 'none'"
+      "base-uri 'none'",
+      "frame-ancestors 'none'"
     ]) {
       expect(headers).toContain(directive);
     }
@@ -25,6 +26,7 @@ describe("static deployment security headers", () => {
   });
 
   it("sets browser hardening and feature policies", () => {
+    expect(headers).toContain("X-Frame-Options: DENY");
     expect(headers).toContain("Referrer-Policy: no-referrer");
     expect(headers).toContain("X-Content-Type-Options: nosniff");
     expect(headers).toContain("Strict-Transport-Security: max-age=31536000; includeSubDomains");
