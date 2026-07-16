@@ -40,6 +40,7 @@ import { TIMELINE_FPS, TIMELINE_TOTAL_FRAMES, advanceFrame, normalizeLoop, planS
 import { useTimelineTransport } from "./useTimelineTransport";
 import { createCameraRecorder, type CameraPose } from "./cameraRecorder";
 import { audioMicFromLaunch, audioReactiveUrlFromLaunch, chooseBootSettingsId, demoLaunchFromSearch, embedFromLaunch, parallelPipelinesFromLaunch, shouldStartPlaying } from "./launchOptions";
+import { curatedPresetIds, defaultCuratedPresetId } from "./curatedPresets";
 import { startMicAudio, type MicAudioStatus, type MicAudioController } from "./micAudio";
 import {
   connectAudioReactiveSocket,
@@ -432,7 +433,6 @@ const maxVolumeSize = 96;
 const volumeStep = 8;
 const minTrailRadius = 0.0015;
 const maxTrailRadiusCap = 0.28;
-const savedSettingsStorageKey = "fluoddity-3d.saved-settings.v1";
 const filePresetModules = import.meta.glob<string>("../Presets/*", {
   eager: true,
   import: "default",
@@ -1113,8 +1113,12 @@ export function App() {
   const audioLevelsRef = useRef({ low: 0, mid: 0, high: 0 });
   const [frame, setFrame] = useState(0);
   const [fps, setFps] = useState(0);
-  const [savedSettings, setSavedSettings] = useState<SavedSettingsPreset[]>(loadSavedSettings);
+  const [savedSettings] = useState<SavedSettingsPreset[]>(loadSavedSettings);
   const [selectedSettingsId, setSelectedSettingsId] = useState("");
+  const [selectedBuiltInPresetId, setSelectedBuiltInPresetId] = useState<string>(defaultCuratedPresetId);
+  const curatedSettings = useMemo(() => curatedPresetIds
+    .map((id) => savedSettings.find((settings) => settings.id === id && settings.fileBacked))
+    .filter((settings): settings is SavedSettingsPreset => Boolean(settings)), [savedSettings]);
   const [liveDiagnostics, setLiveDiagnostics] = useState<LiveGpu3dDiagnostics | null>(null);
   const [audioStatus, setAudioStatus] = useState<AudioReactiveSocketStatus>(audioReactiveStatusRef.current);
   const [audioPanel, setAudioPanel] = useState<AudioPanelState>(defaultAudioPanelState);
@@ -1185,7 +1189,6 @@ export function App() {
   const currentSavedUi = useMemo(() => buildSavedUiState({
     playing,
     overlay,
-    viewLocked,
     demoMode,
     frameCap,
     cameraOrbitEnabled: cameraOrbit,
@@ -1193,7 +1196,7 @@ export function App() {
     timelineEnabled,
     timeline,
     trackingControls
-  }), [cameraOrbit, cameraOrbitSpeed, demoMode, frameCap, overlay, playing, timeline, timelineEnabled, trackingControls, viewLocked]);
+  }), [cameraOrbit, cameraOrbitSpeed, demoMode, frameCap, overlay, playing, timeline, timelineEnabled, trackingControls]);
   const currentSavedAudio = useMemo(() => buildSavedAudioState({
     panel: audioPanel,
     sliders: sliderModulations
@@ -2757,31 +2760,6 @@ export function App() {
     }, true);
   }, [updateLiveConfig]);
 
-  const applyPreset = useCallback((presetId: string) => {
-    const preset = getLivePreset(presetId);
-    const current = liveConfigRef.current;
-    const usesPresetRenderControls = Boolean(preset.renderControls);
-    setSelectedPresetId(preset.id);
-    setSelectedSettingsId("");
-    if (preset.renderControls) {
-      setControls((currentControls) => {
-        const nextControls = normalizeRenderControlsForDisplayMode("live", {
-          ...currentControls,
-          ...preset.renderControls
-        });
-        controlsRef.current = nextControls;
-        return nextControls;
-      });
-    }
-    updateLiveConfig({
-      ...preset.config,
-      particleCount: usesPresetRenderControls ? preset.config.particleCount : current.particleCount,
-      width: usesPresetRenderControls ? preset.config.width : current.width,
-      height: usesPresetRenderControls ? preset.config.height : current.height,
-      depth: usesPresetRenderControls ? preset.config.depth : current.depth
-    }, true);
-  }, [updateLiveConfig]);
-
   const applySettingsPreset = useCallback((settings: SavedSettingsPreset) => {
     const nextConfig = sanitizeLiveConfig(settings.liveConfig);
     const nextControls = normalizeRenderControlsForDisplayMode("live", sanitizeRenderControls(settings.controls));
@@ -2789,6 +2767,9 @@ export function App() {
     const nextUi = sanitizeSavedUiState(uiSource, fallbackPlayingForSavedUi(uiSource));
     const nextAudio = sanitizeSavedAudioState(settings.audio);
     setSelectedSettingsId(settings.id);
+    if (settings.fileBacked && curatedPresetIds.some((id) => id === settings.id)) {
+      setSelectedBuiltInPresetId(settings.id);
+    }
     setSelectedPresetId(settings.presetId);
     setPlaying(nextUi.playing);
     playingRef.current = nextUi.playing;
@@ -2798,8 +2779,8 @@ export function App() {
     setCameraOrbitSpeed(nextUi.cameraOrbit.speed);
     cameraOrbitRef.current = nextUi.cameraOrbit.enabled;
     cameraOrbitSpeedRef.current = nextUi.cameraOrbit.speed;
-    setViewLocked(nextUi.viewLocked);
-    viewLockedRef.current = nextUi.viewLocked;
+    setViewLocked(false);
+    viewLockedRef.current = false;
     setDemoMode(nextUi.demoMode);
     demoModeRef.current = nextUi.demoMode;
     setFrameCap(nextUi.frameCap);
@@ -2848,9 +2829,14 @@ export function App() {
     return () => { delete window.__fluoddityApplyPreset; };
   }, [applySettingsPreset]);
 
+  const chooseCuratedPreset = useCallback((id: string) => {
+    const preset = curatedSettings.find((settings) => settings.id === id);
+    if (preset) applySettingsPreset(preset);
+  }, [applySettingsPreset, curatedSettings]);
+
   // On first load, apply the boot saved-settings preset (full apply, so MIDI/audio mappings load
-  // too): `?settings=<name|id>` selects explicitly (the website embed passes ?settings=AR11),
-  // otherwise the repo NewDefault/AR10 default. Skipped for automation/profiling
+  // too): `?settings=<name|id>` selects explicitly (legacy names such as AR11 still work),
+  // otherwise the curated Default preset. Skipped for automation/profiling
   // (?profileGpu or ?skipAppCompute) or an unknown ?settings name, and only runs once.
   const appliedDefaultPresetRef = useRef(false);
   useEffect(() => {
@@ -2879,25 +2865,10 @@ export function App() {
     const presetName = existing?.name ?? defaultSettingsName(selectedPresetId);
     try {
       const saved = await saveSettingsPresetWithFilePicker(presetName, (name) => (
-        buildSavedSettingsPreset(name, selectedPresetId, displayMode, controls, liveConfig, currentSavedUi, currentSavedAudio, existing)
+        buildSavedSettingsPreset(name, selectedPresetId, displayMode, controls, liveConfig, currentSavedUi, currentSavedAudio)
       ));
       if (!saved) return;
       publishSavedSettingsForAutomation(saved);
-      const next = upsertSavedSettings(savedSettings, saved);
-      persistSavedSettings(next);
-      setSavedSettings(next);
-      setSelectedSettingsId(saved.id);
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : String(error));
-    }
-  }, [controls, currentSavedAudio, currentSavedUi, displayMode, liveConfig, savedSettings, selectedPresetId, selectedSettingsId]);
-
-  const exportCurrentSettings = useCallback(async () => {
-    const existing = savedSettings.find((item) => item.id === selectedSettingsId);
-    try {
-      await saveSettingsPresetWithFilePicker(existing?.name ?? getLivePreset(selectedPresetId).name, (name) => (
-        buildSavedSettingsPreset(name, selectedPresetId, displayMode, controls, liveConfig, currentSavedUi, currentSavedAudio, existing)
-      ));
     } catch (error) {
       window.alert(error instanceof Error ? error.message : String(error));
     }
@@ -2905,11 +2876,8 @@ export function App() {
 
   const importSettingsFile = useCallback(async (file: File) => {
     const imported = settingsPresetFromJson(await file.text(), settingsNameFromFileName(file.name));
-    const next = upsertSavedSettings(savedSettings, imported);
-    persistSavedSettings(next);
-    setSavedSettings(next);
     applySettingsPreset(imported);
-  }, [applySettingsPreset, savedSettings]);
+  }, [applySettingsPreset]);
 
   const openSettingsJson = useCallback(async () => {
     const pickerWindow = window as FilePickerWindow;
@@ -3209,12 +3177,11 @@ export function App() {
       </section>
 
       <aside id="control-panel" className="control-panel" data-testid="control-panel" aria-label="3D Life cockpit controls">
-        <PresetSelect value={selectedPresetId} onChange={applyPreset} />
+        <PresetSelect value={selectedBuiltInPresetId} settings={curatedSettings} onChange={chooseCuratedPreset} />
         <ControlGroup title="Settings">
           <div className="settings-actions">
             <button className="settings-primary-action" data-testid="play-toggle" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play"}</button>
-            <button data-testid="save-settings" onClick={saveCurrentSettings}>Save preset</button>
-            <button data-testid="export-settings" onClick={exportCurrentSettings}>Export JSON</button>
+            <button data-testid="save-settings" onClick={saveCurrentSettings}>Save JSON</button>
             <button data-testid="import-settings" onClick={openSettingsJson}>Load JSON</button>
           </div>
           <input
@@ -4217,12 +4184,16 @@ function Checkbox(props: { label: string; checked: boolean; testId?: string; onC
   );
 }
 
-function PresetSelect(props: { value: string; onChange: (value: string) => void }) {
+function PresetSelect(props: {
+  value: string;
+  settings: SavedSettingsPreset[];
+  onChange: (value: string) => void;
+}) {
   return (
     <label className="control-row">
       <span title={controlHint("Preset")}>Preset</span>
       <select data-testid="preset-select" name="preset" value={props.value} onChange={(event) => props.onChange(event.target.value)}>
-        {livePresets.map((preset) => (
+        {props.settings.map((preset) => (
           <option key={preset.id} value={preset.id}>{preset.name}</option>
         ))}
       </select>
@@ -4586,7 +4557,6 @@ function renderControlsWithModulationRangeOverrides(
 function buildSavedUiState(value: {
   playing: boolean;
   overlay: boolean;
-  viewLocked: boolean;
   demoMode: boolean;
   frameCap: number;
   cameraOrbitEnabled: boolean;
@@ -4598,7 +4568,7 @@ function buildSavedUiState(value: {
   return sanitizeSavedUiState({
     playing: value.playing,
     overlay: value.overlay,
-    viewLocked: value.viewLocked,
+    viewLocked: false,
     demoMode: value.demoMode,
     frameCap: value.frameCap,
     cameraOrbit: {
@@ -4694,7 +4664,7 @@ function publishSavedSettingsForAutomation(settings: SavedSettingsPreset): void 
 }
 
 function loadSavedSettings(): SavedSettingsPreset[] {
-  return mergeSavedSettings(loadFileBackedSettings(), loadBrowserSavedSettings());
+  return loadFileBackedSettings();
 }
 
 function loadFileBackedSettings(): SavedSettingsPreset[] {
@@ -4714,47 +4684,6 @@ function loadFileBackedSettings(): SavedSettingsPreset[] {
     }
   }
   return presets;
-}
-
-function loadBrowserSavedSettings(): SavedSettingsPreset[] {
-  try {
-    const raw = localStorage.getItem(savedSettingsStorageKey);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((item, index) => settingsPresetFromUnknown(item, `Saved ${index + 1}`))
-      .filter((item): item is SavedSettingsPreset => !!item)
-      .map((item) => ({ ...item, fileBacked: false }));
-  } catch {
-    return [];
-  }
-}
-
-function persistSavedSettings(settings: SavedSettingsPreset[]): void {
-  localStorage.setItem(savedSettingsStorageKey, JSON.stringify(settings.filter((item) => !item.fileBacked)));
-}
-
-function upsertSavedSettings(settings: SavedSettingsPreset[], next: SavedSettingsPreset): SavedSettingsPreset[] {
-  return mergeSavedSettings([next], settings.filter((item) => item.id !== next.id));
-}
-
-function mergeSavedSettings(primary: SavedSettingsPreset[], fallback: SavedSettingsPreset[]): SavedSettingsPreset[] {
-  const byId = new Map<string, SavedSettingsPreset>();
-  for (const settings of [...fallback, ...primary]) {
-    const existing = byId.get(settings.id);
-    if (!existing || savedSettingsTime(settings) >= savedSettingsTime(existing)) {
-      byId.set(settings.id, settings);
-    }
-  }
-  return Array.from(byId.values()).sort((a, b) =>
-    savedSettingsTime(b) - savedSettingsTime(a) || a.name.localeCompare(b.name)
-  );
-}
-
-function savedSettingsTime(settings: SavedSettingsPreset): number {
-  const updated = Date.parse(settings.updatedAt || settings.createdAt || "");
-  return Number.isFinite(updated) ? updated : 0;
 }
 
 function settingsPresetFromJson(json: string, fallbackName: string): SavedSettingsPreset {
@@ -4838,7 +4767,7 @@ function sanitizeSavedUiState(value: unknown, fallbackPlaying = false): SavedUiS
   return {
     playing,
     overlay: typeof source.overlay === "boolean" ? source.overlay : false,
-    viewLocked: typeof source.viewLocked === "boolean" ? source.viewLocked : false,
+    viewLocked: false,
     demoMode: typeof source.demoMode === "boolean" ? source.demoMode : false,
     frameCap: clamp(finiteNumber(source.frameCap, 60), 0, 120),
     cameraOrbit: {

@@ -36,13 +36,14 @@ describe("launch options", () => {
 
   it("skips default saved settings for automation unless settings are explicit", () => {
     const candidates = [
-      { id: "file-newdefault-json", name: "NewDefault" },
-      { id: "file-ar10-json", name: "AR10" }
+      { id: "file-default-json", name: "Default" },
+      { id: "file-viridian-aurora-json", name: "Viridian Aurora" }
     ];
 
-    expect(chooseBootSettingsId("", candidates)).toBe("file-newdefault-json");
+    expect(chooseBootSettingsId("", candidates)).toBe("file-default-json");
     expect(chooseBootSettingsId("?skipAppCompute=1", candidates)).toBeNull();
     expect(chooseBootSettingsId("?profileGpu=1", candidates)).toBeNull();
-    expect(chooseBootSettingsId("?skipAppCompute=1&settings=AR10", candidates)).toBe("file-ar10-json");
+    expect(chooseBootSettingsId("?skipAppCompute=1&settings=AR11", candidates)).toBe("file-viridian-aurora-json");
+    expect(chooseBootSettingsId("?settings=Viridian%20Aurora", candidates)).toBe("file-viridian-aurora-json");
   });
 });

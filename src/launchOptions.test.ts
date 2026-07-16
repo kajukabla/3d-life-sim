@@ -41,31 +41,30 @@ describe("demoLaunchFromSearch", () => {
 
 describe("chooseBootSettingsId", () => {
   const candidates = [
-    { id: "file-newdefault-json", name: "NewDefault" },
-    { id: "file-ar10-json", name: "AR10" },
-    { id: "file-ar11-json", name: "AR11" },
+    { id: "file-default-json", name: "Default" },
+    { id: "file-viridian-aurora-json", name: "Viridian Aurora" },
     { id: "abc-123", name: "GooWalls" }
   ];
 
-  it("defaults to NewDefault with no params", () => {
-    expect(chooseBootSettingsId("", candidates)).toBe("file-newdefault-json");
+  it("defaults to the curated Default preset with no params", () => {
+    expect(chooseBootSettingsId("", candidates)).toBe("file-default-json");
   });
 
-  it("falls back to AR10 when NewDefault is absent", () => {
-    const noNewDefault = candidates.filter((c) => c.name !== "NewDefault");
-    expect(chooseBootSettingsId("", noNewDefault)).toBe("file-ar10-json");
+  it("applies no implicit preset when the curated Default is absent", () => {
+    const noDefault = candidates.filter((c) => c.name !== "Default");
+    expect(chooseBootSettingsId("", noDefault)).toBeNull();
   });
 
-  it("?settings=AR11 selects AR11 by name (case-insensitive)", () => {
-    expect(chooseBootSettingsId("?settings=AR11", candidates)).toBe("file-ar11-json");
-    expect(chooseBootSettingsId("?settings=ar11", candidates)).toBe("file-ar11-json");
+  it("keeps the legacy AR11 query alias working", () => {
+    expect(chooseBootSettingsId("?settings=AR11", candidates)).toBe("file-viridian-aurora-json");
+    expect(chooseBootSettingsId("?settings=ar11", candidates)).toBe("file-viridian-aurora-json");
   });
 
   it("?settings can select by id too", () => {
     expect(chooseBootSettingsId("?settings=abc-123", candidates)).toBe("abc-123");
   });
 
-  it("unknown or empty ?settings applies nothing (no AR10 fallback)", () => {
+  it("unknown or empty ?settings applies nothing", () => {
     expect(chooseBootSettingsId("?settings=Nope", candidates)).toBeNull();
     expect(chooseBootSettingsId("?settings=", candidates)).toBeNull();
   });
@@ -74,7 +73,7 @@ describe("chooseBootSettingsId", () => {
     expect(chooseBootSettingsId("?profileGpu", candidates)).toBeNull();
   });
 
-  it("?settings wins even when profileGpu is absent and AR10 exists", () => {
+  it("?settings can select a non-curated candidate by name", () => {
     expect(chooseBootSettingsId("?settings=GooWalls", candidates)).toBe("abc-123");
   });
 });
