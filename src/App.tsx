@@ -3762,7 +3762,7 @@ export function App() {
           <Metric label="Trail Scale" value={liveDiagnostics ? liveDiagnostics.depositScale.toFixed(4) : "..."} />
           <Metric label="GPU MB" value={liveDiagnostics ? ((liveDiagnostics.particleBufferBytes * 2 + liveDiagnostics.fieldBufferBytes * 3) / 1048576).toFixed(0) : "..."} />
         </div>
-        <details className="diagnostics-panel" open data-testid="status">
+        <details className="diagnostics-panel" data-testid="status">
           <summary>Diagnostics</summary>
           <div className="status-list">
             <span>{webgpu.checked ? (webgpu.deviceOk ? "WebGPU verified" : "WebGPU fallback verified") : "Checking GPU"}</span>
@@ -3814,11 +3814,11 @@ function AudioPanel(props: {
     });
   };
   return (
-    <section className="audio-panel" data-testid="audio-panel">
-      <div className="audio-panel-title">
+    <details className="audio-panel control-group-collapsible" data-testid="audio-panel">
+      <summary className="audio-panel-title">
         <span>Audio</span>
         <strong>{props.status.connected ? "on" : "off"}</strong>
-      </div>
+      </summary>
       <div className="audio-input-row">
         <span>Input</span>
         <div className="audio-input-picker">
@@ -3940,7 +3940,7 @@ function AudioPanel(props: {
         ))}
       </div>
       <div className="audio-frame-readout">{props.lastSequence === null ? "..." : props.lastSequence}</div>
-    </section>
+    </details>
   );
 }
 
@@ -3963,11 +3963,11 @@ function MidiPanel(props: {
       : props.activeInputId;
   const statusLabel = props.learningKey ? "learn" : props.status.enabled ? "on" : "off";
   return (
-    <section className="midi-panel" data-testid="midi-panel">
-      <div className="midi-panel-title">
+    <details className="midi-panel control-group-collapsible" data-testid="midi-panel">
+      <summary className="midi-panel-title">
         <span>MIDI</span>
         <strong>{statusLabel}</strong>
-      </div>
+      </summary>
       <div className="midi-action-row">
         <button data-testid="midi-enable" type="button" disabled={!props.status.supported} onClick={props.onEnable}>Enable</button>
         <button data-testid="midi-refresh" type="button" disabled={!props.status.supported} onClick={props.onRefresh}>Refresh</button>
@@ -4029,7 +4029,7 @@ function MidiPanel(props: {
       <div className="midi-frame-readout" data-testid="midi-last-message">
         {props.status.lastMessage ?? String(props.status.messageCount)}
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -4333,17 +4333,7 @@ function SliderModulationBody(props: {
 
 function ControlGroup(props: { title: string; children: ReactNode }) {
   return (
-    <section className="control-group">
-      <div className="control-group-title">{props.title}</div>
-      {props.children}
-    </section>
-  );
-}
-
-// Like ControlGroup but collapsible via native <details> for less frequently used controls.
-function CollapsibleGroup(props: { title: string; testId?: string; defaultOpen?: boolean; children: ReactNode }) {
-  return (
-    <details className="control-group control-group-collapsible" data-testid={props.testId} open={props.defaultOpen}>
+    <details className="control-group control-group-collapsible">
       <summary className="control-group-title">{props.title}</summary>
       {props.children}
     </details>

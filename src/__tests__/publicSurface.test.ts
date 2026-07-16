@@ -15,6 +15,15 @@ describe("public particle-only surface", () => {
     expect(appSource).not.toContain("loadCacheCloud");
   });
 
+  it("starts every named cockpit section collapsed", () => {
+    expect(appSource).toContain('<details className="control-group control-group-collapsible">');
+    expect(appSource).toContain('<details className="audio-panel control-group-collapsible"');
+    expect(appSource).toContain('<details className="midi-panel control-group-collapsible"');
+    expect(appSource).toContain('<details className="diagnostics-panel" data-testid="status">');
+    expect(appSource).not.toContain('<details className="diagnostics-panel" open');
+    expect(appSource).not.toContain("function CollapsibleGroup");
+  });
+
   it("ships the selected particle presets without MIDI mappings", () => {
     for (const fileName of ["vid1.json", "vid2.json", "AR11.json"]) {
       const raw = readFileSync(new URL(`../../Presets/${fileName}`, import.meta.url), "utf8");
