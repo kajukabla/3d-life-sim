@@ -1,4 +1,4 @@
-import type { ParticleBlendMode, ParticleColorMode, RenderControls, TrailColorMode } from "./cacheRenderer";
+import type { ParticleBlendMode, ParticleColorMode, RenderControls, TrailColorMode } from "./renderControls";
 import { maxRayResolution, resizeCanvasToDisplayResolution } from "./renderTarget";
 import { requestHighPerformanceWebGpuAdapter } from "./webgpu";
 import { configureHdrWebGpuCanvas, type WebGpuCanvasColor } from "./webgpuCanvas";

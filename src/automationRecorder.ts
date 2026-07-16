@@ -11,7 +11,7 @@
 // per rendered frame. Wall-clock timestamps let the exporter resample our variable live
 // cadence to a constant-fps video that stays in sync with the music. Mirrors cameraRecorder.ts.
 
-import type { RenderControls } from "./cacheRenderer";
+import type { RenderControls } from "./renderControls";
 import type { LiveGpu3dConfig } from "./realtimeGpuSim3d";
 
 export const AUTOMATION_RECORDING_VERSION = 1;

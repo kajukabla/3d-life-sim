@@ -110,16 +110,6 @@ textarea {
   cursor: move;
 }
 
-.webgpu-proof-canvas {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  left: -10px;
-  top: -10px;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .load-error {
   position: absolute;
   left: 16px;
@@ -316,13 +306,6 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 14px;
-}
-
-.mode-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 10px;
 }
 
 button {

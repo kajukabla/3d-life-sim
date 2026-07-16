@@ -26,11 +26,7 @@ export const DEMO_DRIFT_DENYLIST = [
   "orbit-speed",
   // Color-mode sliders: the demo kept flipping the chosen palette over to green/solid render
   // states. Freeze color so the preset's audio-reactive palette stays put; motion still drifts.
-  "color",
-  // Hue lighting sliders: the demo must never randomize the physical bulbs (a party guest
-  // would leave them in a jarring state). Instead the lights snap to a slow, calm
-  // out-of-phase oscillation when demo engages (see applyLightingDemoRef in App).
-  "lighting"
+  "color"
 ];
 
 // Which MIDI-mapped sliders the idle/instant demo is allowed to drift this re-pick. The MIDI mapping

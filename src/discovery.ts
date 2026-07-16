@@ -1,4 +1,4 @@
-import type { RenderControls } from "./cacheRenderer";
+import type { RenderControls } from "./renderControls";
 import { getLivePreset, livePresets } from "./livePresets";
 import { defaultLiveGpu3dConfig, type LiveGpu3dConfig, type LiveGpu3dDiagnostics } from "./realtimeGpuSim3d";
 import { maxRayResolution } from "./renderTarget";

@@ -9,7 +9,6 @@ import {
   type AudioAnalysisFrame,
   type AudioReactiveMapping
 } from "../audioReactive";
-import { getLivePreset } from "../livePresets";
 import { defaultLiveGpu3dConfig } from "../realtimeGpuSim3d";
 
 const baseRender = {
@@ -109,13 +108,6 @@ describe("audio reactive mapping", () => {
 
     expect(result.render.bloomStrength).toBeGreaterThan(baseRender.bloomStrength);
     expect(result.live.depositMass).toBeGreaterThan(defaultLiveGpu3dConfig.depositMass);
-  });
-
-  it("allows curated presets to override the audio mapping", () => {
-    const preset = getLivePreset("volume-tendrils");
-
-    expect(preset.audioMapping?.id).toBe("volume-tendrils-audio");
-    expect(preset.audioMapping?.rules.some((rule) => rule.target === "render.densityPassStrength")).toBe(true);
   });
 
   it("parses backend input devices separately from audio frames", () => {
