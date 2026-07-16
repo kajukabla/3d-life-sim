@@ -1064,7 +1064,7 @@ export function App() {
   const timelineEnabledRef = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [trackingControls, setTrackingControls] = useState<TrackingControls>(trackingDefaults);
-  const [trackState, setTrackState] = useState<{ active: boolean; members: number; miss?: string }>({ active: false, members: 0 });
+  const [, setTrackState] = useState<{ active: boolean; members: number; miss?: string }>({ active: false, members: 0 });
   const [cameraOrbit, setCameraOrbit] = useState(defaultCameraOrbit.enabled);
   const [cameraOrbitSpeed, setCameraOrbitSpeed] = useState(defaultCameraOrbit.speed);
   // When locked, mouse drag-orbit / pan / wheel-zoom are ignored so the viewport can't be nudged
@@ -3252,20 +3252,6 @@ export function App() {
     };
   }, [applyZoom]);
 
-  const preset = useMemo(() => JSON.stringify({
-    version: 2,
-    name: getLivePreset(selectedPresetId).name,
-    presetId: selectedPresetId,
-    displayMode,
-    seed: deterministicSeed,
-    controls: normalizeRenderControlsForDisplayMode(
-      displayMode,
-      renderControlsWithModulationRangeOverrides(sanitizeRenderControls(controls), controls, currentSavedAudio.sliders)
-    ),
-    liveConfig: sanitizeLiveConfig(liveConfig),
-    ui: currentSavedUi,
-    audio: currentSavedAudio
-  }, null, 2), [controls, currentSavedAudio, currentSavedUi, displayMode, liveConfig, selectedPresetId]);
   const vertexCount = liveVertexCount(liveDiagnostics, liveConfig);
   return (
     <SliderModulationContext.Provider value={sliderModulationContext}>
@@ -3686,28 +3672,6 @@ export function App() {
           <Slider label="Max FPS" value={frameCap} min={0} max={120} step={1} testId="frame-cap-slider" formatValue={(v) => (v <= 0 ? "Off" : String(Math.round(v)))} onChange={(v) => setFrameCap(Math.round(v))} />
         </ControlGroup>
 
-        <ControlGroup title="Track">
-          <Checkbox label="Follow" checked={trackingControls.follow} testId="track-follow-checkbox" onChange={(follow) => setTrackingControls((t) => ({ ...t, follow }))} />
-          <Checkbox label="Look" checked={trackingControls.look} testId="track-look-checkbox" onChange={(look) => setTrackingControls((t) => ({ ...t, look }))} />
-          <Slider label="Follow Speed" value={trackingControls.followSpeed} {...trackingSliderRanges.followSpeed} testId="follow-speed-slider" onChange={(followSpeed) => setTrackingControls((t) => ({ ...t, followSpeed }))} />
-          <Slider label="Follow Smooth" value={trackingControls.followSmoothing} {...trackingSliderRanges.followSmoothing} onChange={(followSmoothing) => setTrackingControls((t) => ({ ...t, followSmoothing }))} />
-          <Slider label="Look Speed" value={trackingControls.lookSpeed} {...trackingSliderRanges.lookSpeed} testId="look-speed-slider" onChange={(lookSpeed) => setTrackingControls((t) => ({ ...t, lookSpeed }))} />
-          <Slider label="Look Smooth" value={trackingControls.lookSmoothing} {...trackingSliderRanges.lookSmoothing} onChange={(lookSmoothing) => setTrackingControls((t) => ({ ...t, lookSmoothing }))} />
-          <Slider label="Follow Dist" value={trackingControls.followDistance} {...trackingSliderRanges.followDistance} testId="follow-distance-slider" onChange={(followDistance) => setTrackingControls((t) => ({ ...t, followDistance }))} />
-          <Slider label="Follow Height" value={trackingControls.followHeight} {...trackingSliderRanges.followHeight} testId="follow-height-slider" onChange={(followHeight) => setTrackingControls((t) => ({ ...t, followHeight }))} />
-          <Slider label="Cohesion" value={trackingControls.cohesion} {...trackingSliderRanges.cohesion} testId="cohesion-slider" onChange={(cohesion) => setTrackingControls((t) => ({ ...t, cohesion }))} />
-          <div className="control-row" data-testid="track-status">
-            <span>Locked</span>
-            <output>{trackState.active ? `${trackState.members} particles` : trackState.miss ?? "none"}</output>
-          </div>
-          <button
-            data-testid="track-release"
-            onClick={() => { trackerRef.current.release(); setTrackState({ active: false, members: 0 }); }}
-          >
-            Release
-          </button>
-        </ControlGroup>
-
         <AudioPanel
           status={audioStatus}
           meters={audioMeters}
@@ -3748,35 +3712,6 @@ export function App() {
           }}
         />
 
-        <div className="metrics-grid">
-          <Metric label="Live Step" value={String(liveDiagnostics?.timestep ?? "...")} />
-          <Metric label="Voxels" value={String(liveDiagnostics?.voxelCount ?? liveConfig.width * liveConfig.height * liveConfig.depth)} />
-          <Metric label="Render Target" value={liveDiagnostics ? `${liveDiagnostics.renderResolution[0]}x${liveDiagnostics.renderResolution[1]}` : `${controls.rayResolution}p`} />
-          <Metric label="Renderer" value={liveDiagnostics ? "Live 3D" : "..."} />
-          <Metric label="GPU" value={webgpu.deviceOk ? "OK" : webgpu.checked ? "Fallback" : "..."} />
-          <Metric label="Flow" value={liveDiagnostics ? liveDiagnostics.fieldStats.flowSum.toFixed(2) : "..."} />
-          <Metric label="Frame ms" value={liveDiagnostics ? liveDiagnostics.frameTimeMs.toFixed(1) : "..."} />
-          <Metric label="Tap" value={String(liveDiagnostics?.depositTaps ?? Math.pow(liveConfig.depositTapRadius * 2 + 1, 3))} />
-          <Metric label="Voxel" value={(2 / liveConfig.width).toFixed(4)} />
-          <Metric label="Sigma" value={liveConfig.sigma.toFixed(4)} />
-          <Metric label="Trail Scale" value={liveDiagnostics ? liveDiagnostics.depositScale.toFixed(4) : "..."} />
-          <Metric label="GPU MB" value={liveDiagnostics ? ((liveDiagnostics.particleBufferBytes * 2 + liveDiagnostics.fieldBufferBytes * 3) / 1048576).toFixed(0) : "..."} />
-        </div>
-        <details className="diagnostics-panel" data-testid="status">
-          <summary>Diagnostics</summary>
-          <div className="status-list">
-            <span>{webgpu.checked ? (webgpu.deviceOk ? "WebGPU verified" : "WebGPU fallback verified") : "Checking GPU"}</span>
-            <span>{compute3d ? (compute3d.passed ? "3D compute verified" : "3D compute pending") : "3D compute checking"}</span>
-            <span>{liveDiagnostics?.particleCount ?? liveConfig.particleCount} live particles</span>
-            <span>{liveDiagnostics?.renderMode ?? "particle renderer pending"}</span>
-            <span>{liveDiagnostics?.depositMode ?? "deposit pending"}</span>
-            <span>frame {frame}</span>
-          </div>
-        </details>
-        <details className="preset-json">
-          <summary>Preset JSON</summary>
-          <textarea name="current-preset-json" value={preset} readOnly aria-label="Current preset JSON" />
-        </details>
       </aside>
       </main>
     </SliderModulationContext.Provider>
@@ -4604,15 +4539,6 @@ function DraftNumberInput(props: {
   );
 }
 
-function MetricImpl(props: { label: string; value: string }) {
-  return (
-    <div>
-      <span title={controlHint(props.label)}>{props.label}</span>
-      <strong>{props.value}</strong>
-    </div>
-  );
-}
-
 // Memoized control widgets: a value-based comparator so a diagnostics/meter-driven App
 // re-render skips every control whose value is unchanged (no panel reconcile while the menu
 // is open). onChange identity is intentionally ignored — the closures use functional
@@ -4629,7 +4555,6 @@ const Slider = memo(
 );
 const ColorField = memo(ColorFieldImpl, (a, b) => a.value === b.value && a.label === b.label);
 const ModeSlider = memo(ModeSliderImpl, (a, b) => a.value === b.value && a.label === b.label);
-const Metric = memo(MetricImpl, (a, b) => a.value === b.value && a.label === b.label);
 
 function inputName(label: string): string {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

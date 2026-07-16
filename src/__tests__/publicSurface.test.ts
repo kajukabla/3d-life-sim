@@ -15,13 +15,19 @@ describe("public particle-only surface", () => {
     expect(appSource).not.toContain("loadCacheCloud");
   });
 
-  it("starts every named cockpit section collapsed", () => {
+  it("starts every remaining cockpit section collapsed", () => {
     expect(appSource).toContain('<details className="control-group control-group-collapsible">');
     expect(appSource).toContain('<details className="audio-panel control-group-collapsible"');
     expect(appSource).toContain('<details className="midi-panel control-group-collapsible"');
-    expect(appSource).toContain('<details className="diagnostics-panel" data-testid="status">');
-    expect(appSource).not.toContain('<details className="diagnostics-panel" open');
     expect(appSource).not.toContain("function CollapsibleGroup");
+  });
+
+  it("ends the public cockpit at MIDI", () => {
+    expect(appSource).not.toContain('<ControlGroup title="Track">');
+    expect(appSource).not.toContain('data-testid="track-release"');
+    expect(appSource).not.toContain('className="metrics-grid"');
+    expect(appSource).not.toContain('className="diagnostics-panel"');
+    expect(appSource).not.toContain('className="preset-json"');
   });
 
   it("ships the selected particle presets without MIDI mappings", () => {

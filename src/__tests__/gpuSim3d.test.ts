@@ -841,7 +841,6 @@ describe("3D WebGPU compute reference", () => {
     expect(appSource).toContain("const normalizedControls = normalizeRenderControlsForDisplayMode(");
     expect(appSource).toContain("renderControlsWithModulationRangeOverrides(sanitizeRenderControls(controls), controls, audio.sliders)");
     expect(appSource).toContain("controls: normalizedControls");
-    expect(appSource).toContain("renderControlsWithModulationRangeOverrides(sanitizeRenderControls(controls), controls, currentSavedAudio.sliders)");
     expect(appSource).toContain("liveConfig: sanitizeLiveConfig(liveConfig)");
     expect(appSource).toContain('const displayMode: DisplayMode = "live";');
     expect(appSource).toContain("renderControls: sanitizeRenderControls(rendered)");
