@@ -10,9 +10,10 @@ describe("static deployment security headers", () => {
     for (const directive of [
       "default-src 'self'",
       "script-src 'self'",
+      "worker-src 'self'",
       "style-src 'self'",
       "img-src 'self' data:",
-      "connect-src 'self' ws://127.0.0.1:* ws://localhost:*",
+      "connect-src 'self'",
       "object-src 'none'",
       "base-uri 'none'"
     ]) {
@@ -20,6 +21,7 @@ describe("static deployment security headers", () => {
     }
     expect(headers).not.toContain("'unsafe-inline'");
     expect(headers).not.toContain("'unsafe-eval'");
+    expect(headers).not.toContain("ws://");
   });
 
   it("sets browser hardening and feature policies", () => {

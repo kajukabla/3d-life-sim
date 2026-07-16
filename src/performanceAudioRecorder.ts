@@ -2,8 +2,8 @@
 // music stitched onto it (see tools/hdr-export --audio). Audio is essentially free to capture in
 // real time — unlike the HDR video frames, which is why the visuals are replayed offline and the
 // audio is just recorded live and muxed on afterward. We record the SAME MediaStream that feeds the
-// audio-reactivity analyzer (the mic/loopback input), so the recorded track and the modulation it
-// produced are inherently in sync. Pick a system-audio loopback as the input device for clean music.
+// browser audio analyzer, so the recorded track and the modulation it produced are inherently in
+// sync. A browser-visible virtual input can be selected when clean system-audio capture is needed.
 
 export type PerformanceAudioRecording = {
   blob: Blob;

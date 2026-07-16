@@ -14,6 +14,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     baseURL: externalBaseUrl ?? localBaseUrl,
+    permissions: ["microphone"],
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     video: "retain-on-failure"
@@ -32,7 +33,11 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: {
-          args: ["--enable-unsafe-webgpu"]
+          args: [
+            "--enable-unsafe-webgpu",
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream"
+          ]
         }
       }
     }

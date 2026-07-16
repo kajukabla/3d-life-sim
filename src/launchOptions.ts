@@ -1,11 +1,5 @@
 import { defaultCuratedPresetId, legacyCuratedPresetIds } from "./curatedPresets";
 
-export const defaultAudioReactiveWsUrl = "ws://127.0.0.1:47831";
-
-type AudioReactiveLaunchEnv = {
-  VITE_AUDIO_REACTIVE_DEFAULT?: string;
-};
-
 export function shouldStartPlaying(search: string): boolean {
   return new URLSearchParams(search).get("playing") !== "0";
 }
@@ -17,38 +11,16 @@ export function parallelPipelinesFromLaunch(search: string): boolean {
 }
 
 // The website embed's iframes always carry ?embed=1 (appended by the bay scheduler).
-// Embedded viewers can never reach the native Rust helper, so embed mode forbids the
-// WebSocket path entirely and the helper-download gate can never trigger.
 export function embedFromLaunch(search: string): boolean {
   return new URLSearchParams(search).get("embed") === "1";
 }
 
-export function audioReactiveUrlFromLaunch(search: string, env: AudioReactiveLaunchEnv): string | null {
-  const params = new URLSearchParams(search);
-  if (embedFromLaunch(search) || audioMicFromLaunch(search)) return null;
-  const defaultEnabled = env.VITE_AUDIO_REACTIVE_DEFAULT === "1";
-  const disabled = params.get("audio") === "0" || params.get("audioReactive") === "0";
-  const enabled = !disabled && (defaultEnabled || params.get("audio") === "1" || params.get("audioReactive") === "1");
-  return enabled ? loopbackAudioWsUrl(params.get("audioWs")) : null;
-}
-
-export function loopbackAudioWsUrl(value: string | null): string {
-  if (!value) return defaultAudioReactiveWsUrl;
-  try {
-    const url = new URL(value);
-    const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "::1";
-    if (url.protocol !== "ws:" || !loopback) return defaultAudioReactiveWsUrl;
-    return `ws://${url.host}`;
-  } catch {
-    return defaultAudioReactiveWsUrl;
-  }
-}
-
-// In-browser microphone analyzer (no native helper, no WebSocket). Explicit via
-// ?audio=mic; embedded mode defaults to it unless audio is switched off outright.
+// Browser audio is normally started by the cockpit button. Embedded viewers and
+// explicit legacy audio launch values can request an immediate permission prompt.
 export function audioMicFromLaunch(search: string): boolean {
   const audio = new URLSearchParams(search).get("audio");
-  if (audio === "mic") return true;
+  if (audio === "0") return false;
+  if (audio === "mic" || audio === "1") return true;
   return embedFromLaunch(search) && audio !== "0";
 }
 

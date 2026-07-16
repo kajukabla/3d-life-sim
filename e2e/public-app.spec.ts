@@ -65,3 +65,18 @@ test("rejects oversized preset files in the browser", async ({ page }) => {
   });
   await expect(dialogPromise).resolves.toContain("too large");
 });
+
+test("runs microphone analysis entirely in the browser", async ({ page }) => {
+  await page.getByTestId("audio-panel").locator("summary").click();
+  const capture = page.getByTestId("audio-capture-toggle");
+
+  await expect(capture).toHaveText("Start microphone");
+  await capture.click();
+  await expect(capture).toHaveText("Stop microphone");
+  await expect(page.getByTestId("audio-capture-status")).toHaveText("Live");
+  await expect(page.getByTestId("audio-input-select")).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => (
+    (window as unknown as { __fluoddityBrowserAudio?: () => { frameCount: number } })
+      .__fluoddityBrowserAudio?.().frameCount ?? 0
+  ))).toBeGreaterThan(0);
+});

@@ -27,7 +27,7 @@ Useful shortcuts:
 - `M` — hide or show the cockpit
 - `R` — start or stop a performance recording
 
-Browser microphone analysis is opt-in with `?audio=mic`. WebSocket audio input is also opt-in and accepts loopback connections only. The normal simulation does not contact a backend and needs no API keys.
+Open the Audio section and select `Start microphone` to enable music reactivity. Capture and three-band analysis run locally in an `AudioWorklet`; audio is never uploaded and the application does not contact a backend. `?audio=mic` and the legacy `?audio=1` launch values can still request browser audio automatically.
 
 The preset dropdown contains four bundled looks: `Default`, `Electric Current`, `Ice Flower`, and `Viridian Aurora`. `Save JSON` and `Load JSON` make presets portable without an account or server database. Imported preset files must be JSON and are limited to 1 MB; camera lock is always disabled when a preset loads.
 

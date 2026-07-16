@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const appSource = readFileSync(new URL("../App.tsx", import.meta.url), "utf8");
+const launchSource = readFileSync(new URL("../launchOptions.ts", import.meta.url), "utf8");
+const audioSource = readFileSync(new URL("../audioReactive.ts", import.meta.url), "utf8");
 
 describe("public particle-only surface", () => {
   it("does not expose cache, alternate render-mode, or Hue controls", () => {
@@ -55,6 +57,16 @@ describe("public particle-only surface", () => {
     expect(appSource).not.toContain('className="metrics-grid"');
     expect(appSource).not.toContain('className="diagnostics-panel"');
     expect(appSource).not.toContain('className="preset-json"');
+  });
+
+  it("uses browser-only audio without a native helper or WebSocket", () => {
+    expect(appSource).toContain('data-testid="audio-capture-toggle"');
+    expect(appSource).toContain("Start microphone");
+    expect(appSource).not.toContain("connectAudioReactiveSocket");
+    expect(appSource).not.toContain("audioReactiveUrlFromLaunch");
+    expect(launchSource).not.toContain("audioWs");
+    expect(launchSource).not.toContain("127.0.0.1:47831");
+    expect(audioSource).not.toContain("new WebSocket");
   });
 
   it("ships only the renamed curated presets without MIDI mappings or camera locks", () => {

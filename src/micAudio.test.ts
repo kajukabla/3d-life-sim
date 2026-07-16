@@ -24,7 +24,7 @@ function settledFrame(freqHz: number, amplitude: number): ReturnType<MicFilterba
   return frame;
 }
 
-describe("dbToUnit / linearToDb (parity with the Rust analyzer)", () => {
+describe("dbToUnit / linearToDb", () => {
   it("maps floor→0, ceiling→1, midpoint→0.5 and clamps outside", () => {
     expect(dbToUnit(-72, -72, -12)).toBe(0);
     expect(dbToUnit(-12, -72, -12)).toBe(1);
@@ -33,14 +33,14 @@ describe("dbToUnit / linearToDb (parity with the Rust analyzer)", () => {
     expect(dbToUnit(0, -72, -12)).toBe(1);
   });
 
-  it("linearToDb clamps to the Rust MIN_DB_MAGNITUDE floor", () => {
+  it("linearToDb clamps to the minimum magnitude floor", () => {
     expect(linearToDb(1)).toBeCloseTo(0, 5);
     expect(linearToDb(0.1)).toBeCloseTo(-20, 4);
     expect(linearToDb(0)).toBeCloseTo(-180, 1);
   });
 });
 
-// The one-pole filterbank (mirroring crates/audio_analysis Filterbank mode) is gentle —
+// The one-pole filterbank is intentionally gentle —
 // 6 dB/oct skirts leak across bands by design, and the presets' bucket gain/exponent
 // shaping compensates. What must hold is the ORDERING: the band containing the tone
 // reads strictly hotter than its neighbors, in raw dB terms.
@@ -95,7 +95,7 @@ describe("MicFilterbank — band semantics", () => {
 });
 
 describe("MicFilterbank — frame schema and levels", () => {
-  it("emits the Rust AudioAnalysisFrame shape", () => {
+  it("emits the shared AudioAnalysisFrame shape", () => {
     const bank = new MicFilterbank(SAMPLE_RATE, defaultMicAnalysisOptions);
     const frame = bank.analyzeWindow(sine(1000, 0.1), 7, 1.25);
     expect(frame.version).toBe(1);

@@ -39,18 +39,16 @@ import { rayForNdc, worldToCamera, focalToFocus, focusToFocal, type CameraMath3d
 import { TIMELINE_FPS, TIMELINE_TOTAL_FRAMES, advanceFrame, normalizeLoop, planSeek, type TimelineState } from "./timeline";
 import { useTimelineTransport } from "./useTimelineTransport";
 import { createCameraRecorder, type CameraPose } from "./cameraRecorder";
-import { audioMicFromLaunch, audioReactiveUrlFromLaunch, chooseBootSettingsId, demoLaunchFromSearch, embedFromLaunch, parallelPipelinesFromLaunch, shouldStartPlaying } from "./launchOptions";
+import { audioMicFromLaunch, chooseBootSettingsId, demoLaunchFromSearch, embedFromLaunch, parallelPipelinesFromLaunch, shouldStartPlaying } from "./launchOptions";
 import { curatedPresetIds, defaultCuratedPresetId } from "./curatedPresets";
 import { readPresetJsonFile, sanitizePresetName } from "./presetFiles";
-import { startMicAudio, type MicAudioStatus, type MicAudioController } from "./micAudio";
 import {
-  connectAudioReactiveSocket,
-  type AudioAnalysisFrame,
-  type AudioInputDeviceInfo,
-  type AudioReactiveMapping,
-  type AudioReactiveSocketController,
-  type AudioReactiveSocketStatus
-} from "./audioReactive";
+  createBrowserAudio,
+  type BrowserAudioController,
+  type BrowserAudioSnapshot,
+  type BrowserAudioStatus
+} from "./micAudio";
+import { type AudioAnalysisFrame } from "./audioReactive";
 import {
   applyAudioModulation,
   audioBuckets,
@@ -166,8 +164,7 @@ declare global {
     __fluoddityApplyPreset?: (preset: SavedSettingsPreset) => void;
     __fluoddityInjectAudioFrame?: (frame: AudioAnalysisFrame, dtSec?: number) => void;
     __fluoddityInjectMidiMessage?: (data: ArrayLike<number>, inputId?: string, inputName?: string) => void;
-    __fluoddityAudioReactive?: () => AudioReactiveSocketStatus & { enabled: boolean };
-    __fluoddityMicAudio?: () => { status: MicAudioStatus; frameCount: number; lastFrame: AudioAnalysisFrame | null };
+    __fluoddityBrowserAudio?: () => BrowserAudioSnapshot;
   }
 }
 
@@ -346,11 +343,6 @@ type SliderModulationContextValue = {
 };
 
 const SliderModulationContext = createContext<SliderModulationContextValue | null>(null);
-
-const manualSliderAudioMapping: AudioReactiveMapping = {
-  id: "manual-slider-audio-modulation",
-  rules: []
-};
 
 const renderControlSliderTargets = {
   "p-bright": "particleBrightness",
@@ -936,12 +928,7 @@ export function App() {
   const profileGpu = useMemo(() => shouldEnableGpuProfiling(new URLSearchParams(window.location.search)), []);
   const initialPlaying = useMemo(() => shouldStartPlaying(window.location.search), []);
   const parallelPipelines = useMemo(() => parallelPipelinesFromLaunch(window.location.search), []);
-  const audioReactiveUrl = useMemo(() => audioReactiveUrlFromLaunch(window.location.search, {
-    VITE_AUDIO_REACTIVE_DEFAULT: import.meta.env.VITE_AUDIO_REACTIVE_DEFAULT
-  }), []);
-  // ?audio=mic: in-browser microphone analyzer (website embed). Mutually exclusive with the
-  // WebSocket backend above (audioReactiveUrlFromLaunch returns null in mic mode).
-  const audioMicMode = useMemo(() => audioMicFromLaunch(window.location.search), []);
+  const autoStartBrowserAudio = useMemo(() => audioMicFromLaunch(window.location.search), []);
   const appShellRef = useRef<HTMLElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const liveRendererRef = useRef(new RealtimeGpuSim3d());
@@ -959,15 +946,7 @@ export function App() {
   const fpsRef = useRef({ lastTime: 0, frames: 0, value: 0 });
   const jsonInputRef = useRef<HTMLInputElement | null>(null);
   const liveDiagnosticsRef = useRef<LiveGpu3dDiagnostics | null>(null);
-  const audioReactiveStatusRef = useRef<AudioReactiveSocketStatus>({
-    connected: false,
-    frameCount: 0,
-    lastSequence: null,
-    url: audioReactiveUrl ?? ""
-  });
-  const audioSocketControllerRef = useRef<AudioReactiveSocketController | null>(null);
-  const audioConfirmedInputRef = useRef<string | null>(null);
-  const audioPendingInputRef = useRef<string | null>(null);
+  const browserAudioControllerRef = useRef<BrowserAudioController | null>(null);
   const audioModulationRuntimeRef = useRef<AudioModulationRuntime>(createAudioModulationRuntime());
   const audioPanelRef = useRef<AudioPanelState>(defaultAudioPanelState);
   const pendingAudioUiRef = useRef<{ meters: Record<AudioBucket, number>; frame: AudioAnalysisFrame } | null>(null);
@@ -983,7 +962,6 @@ export function App() {
   const midiMessageCountRef = useRef(0);
   const pendingMidiUiRef = useRef<string | null>(null);
   const midiUiRafRef = useRef<number | null>(null);
-  const lastAudioStatusPublishRef = useRef(0);
   const cameraRef = useRef<OrbitCamera>({
     yaw: initialLiveState.controls.cameraYaw,
     pitch: initialLiveState.controls.cameraPitch,
@@ -1031,9 +1009,7 @@ export function App() {
   // Real-time audio capture alongside the performance data: the visuals are replayed offline for HDR,
   // but the audio is recorded live and muxed onto the render afterward (see performanceAudioRecorder.ts).
   const performanceAudioRecorderRef = useRef(createPerformanceAudioRecorder());
-  // The live mic/loopback controller, kept so the audio recorder can grab the exact reactive stream.
-  const micControllerRef = useRef<MicAudioController | null>(null);
-  // A fallback capture stream acquired on demand when not in mic mode (held so a later MIDI/hotkey
+  // A fallback capture stream acquired on demand when browser audio is not running (held so a later MIDI/hotkey
   // start needs no fresh permission gesture).
   const ownCaptureStreamRef = useRef<MediaStream | null>(null);
   const togglePerformanceRecordingRef = useRef<() => void>(() => {});
@@ -1121,15 +1097,17 @@ export function App() {
     .map((id) => savedSettings.find((settings) => settings.id === id && settings.fileBacked))
     .filter((settings): settings is SavedSettingsPreset => Boolean(settings)), [savedSettings]);
   const [liveDiagnostics, setLiveDiagnostics] = useState<LiveGpu3dDiagnostics | null>(null);
-  const [audioStatus, setAudioStatus] = useState<AudioReactiveSocketStatus>(audioReactiveStatusRef.current);
+  const [audioCapture, setAudioCapture] = useState<BrowserAudioSnapshot>({
+    status: "idle",
+    devices: [],
+    activeDeviceId: null,
+    error: null,
+    frameCount: 0,
+    lastSequence: null
+  });
   const [audioPanel, setAudioPanel] = useState<AudioPanelState>(defaultAudioPanelState);
   const [audioMeters, setAudioMeters] = useState<Record<AudioBucket, number>>({ low: 0, mid: 0, high: 0 });
   const [audioLastFrame, setAudioLastFrame] = useState<AudioAnalysisFrame | null>(null);
-  const [audioInputDevices, setAudioInputDevices] = useState<AudioInputDeviceInfo[]>([]);
-  const [audioActiveInput, setAudioActiveInput] = useState<string | null>(null);
-  const [audioPendingInput, setAudioPendingInput] = useState<string | null>(null);
-  const [audioBackendError, setAudioBackendError] = useState<string | null>(null);
-  const [audioReconnectNonce, setAudioReconnectNonce] = useState(0);
   const [sliderModulations, setSliderModulations] = useState<SliderModulationSettings>({});
   const [expandedSliderModulationKey, setExpandedSliderModulationKey] = useState<string | null>(null);
   const [midiStatus, setMidiStatus] = useState<MidiPanelStatus>(() => ({
@@ -1300,17 +1278,6 @@ export function App() {
   useEffect(() => {
     midiLearningKeyRef.current = midiLearningKey;
   }, [midiLearningKey]);
-
-  useEffect(() => {
-    if (!audioPendingInput) return;
-    const timer = window.setTimeout(() => {
-      if (audioPendingInputRef.current === audioPendingInput) {
-        audioPendingInputRef.current = null;
-        setAudioPendingInput(null);
-      }
-    }, 1200);
-    return () => window.clearTimeout(timer);
-  }, [audioPendingInput]);
 
   const registerSliderForAudio = useCallback((key: string, entry: SliderRegistryEntry | null) => {
     if (entry) {
@@ -1571,92 +1538,38 @@ export function App() {
     return () => { delete window.__fluoddityInjectAudioFrame; };
   }, [handleAudioFrame]);
 
-  // Mic mode: feed handleAudioFrame from the in-browser analyzer. The handler goes through a
-  // ref so a re-render never tears down the mic stream (and re-prompts the AudioContext).
+  // Browser audio runs its DSP on the AudioWorklet rendering thread. The handler goes through a
+  // ref so React renders never rebuild the stream or cross the audio-thread boundary unnecessarily.
   const handleAudioFrameRef = useRef(handleAudioFrame);
   useEffect(() => { handleAudioFrameRef.current = handleAudioFrame; }, [handleAudioFrame]);
   useEffect(() => {
-    if (!audioMicMode) return;
-    let frameCount = 0;
-    let status: MicAudioStatus = "starting";
-    let lastFrame: AudioAnalysisFrame | null = null;
-    window.__fluoddityMicAudio = () => ({ status, frameCount, lastFrame });
-    const controller = startMicAudio({
-      onFrame: (frame, dtSec) => {
-        frameCount += 1;
-        lastFrame = frame;
-        handleAudioFrameRef.current(frame, dtSec);
-      },
-      onStatus: (next) => { status = next; }
-    });
-    micControllerRef.current = controller;
-    return () => {
-      controller.stop();
-      if (micControllerRef.current === controller) micControllerRef.current = null;
-      delete window.__fluoddityMicAudio;
-    };
-  }, [audioMicMode]);
-
-  useEffect(() => {
-    if (!audioReactiveUrl || audioStatus.connected) return;
-    const timer = window.setInterval(() => setAudioReconnectNonce((value) => value + 1), 3000);
-    return () => window.clearInterval(timer);
-  }, [audioReactiveUrl, audioStatus.connected]);
-
-  useEffect(() => {
-    if (!audioReactiveUrl) {
-      audioSocketControllerRef.current = null;
-      window.__fluoddityAudioReactive = () => ({ ...audioReactiveStatusRef.current, enabled: false });
-      return () => {
-        delete window.__fluoddityAudioReactive;
-      };
-    }
-    const controller = connectAudioReactiveSocket({
-      url: audioReactiveUrl,
-      mapping: manualSliderAudioMapping,
-      getState: () => ({
-        render: controlsRef.current as unknown as Record<string, unknown>,
-        live: liveConfigRef.current as unknown as Record<string, unknown>
-      }),
-      apply: () => {},
-      onStatus: (status) => {
-        const previous = audioReactiveStatusRef.current;
-        audioReactiveStatusRef.current = status;
-        const now = performance.now();
-        if (previous.connected !== status.connected || now - lastAudioStatusPublishRef.current >= 250) {
-          lastAudioStatusPublishRef.current = now;
-          setAudioStatus(status);
-        }
-      },
-      onFrame: handleAudioFrame,
-      onDevices: (activeInput, devices) => {
-        setAudioActiveInput(activeInput);
-        setAudioInputDevices(devices);
-        setAudioBackendError(null);
-        audioConfirmedInputRef.current = activeInput;
-        const pending = audioPendingInputRef.current;
-        if (pending && activeInput !== pending) {
-          setAudioActiveInput(pending);
-          return;
-        }
-        audioPendingInputRef.current = null;
-        setAudioPendingInput(null);
-      },
-      onBackendError: (message) => {
-        audioPendingInputRef.current = null;
-        setAudioPendingInput(null);
-        setAudioActiveInput(audioConfirmedInputRef.current);
-        setAudioBackendError(message);
+    const controller = createBrowserAudio({
+      onFrame: (frame, dtSec) => handleAudioFrameRef.current(frame, dtSec),
+      onState: (next) => {
+        setAudioCapture((current) => {
+          const devicesChanged = next.devices.length !== current.devices.length || next.devices.some((device, index) => (
+            device.id !== current.devices[index]?.id || device.label !== current.devices[index]?.label
+          ));
+          if (
+            next.status === current.status &&
+            next.activeDeviceId === current.activeDeviceId &&
+            next.error === current.error &&
+            !devicesChanged
+          ) return current;
+          return next;
+        });
       }
     });
-    audioSocketControllerRef.current = controller;
-    window.__fluoddityAudioReactive = () => ({ ...controller.status(), enabled: true });
+    browserAudioControllerRef.current = controller;
+    setAudioCapture(controller.snapshot());
+    window.__fluoddityBrowserAudio = () => controller.snapshot();
+    if (autoStartBrowserAudio) void controller.start();
     return () => {
-      audioSocketControllerRef.current = null;
-      controller.close();
-      delete window.__fluoddityAudioReactive;
+      controller.destroy();
+      if (browserAudioControllerRef.current === controller) browserAudioControllerRef.current = null;
+      delete window.__fluoddityBrowserAudio;
     };
-  }, [audioReactiveUrl, audioReconnectNonce, handleAudioFrame]);
+  }, [autoStartBrowserAudio]);
 
   useEffect(() => {
     playingRef.current = playing;
@@ -2015,11 +1928,7 @@ export function App() {
       live: liveDiagnosticsRef.current,
       controls,
       audio: {
-        status: audioStatus,
-        activeInput: audioActiveInput,
-        pendingInput: audioPendingInput,
-        inputs: audioInputDevices,
-        error: audioBackendError,
+        capture: browserAudioControllerRef.current?.snapshot() ?? audioCapture,
         panel: audioPanel,
         meters: audioMeters,
         lastSequence: audioLastFrame?.sequence ?? null,
@@ -2053,7 +1962,7 @@ export function App() {
     return () => {
       delete window.__fluoddityDiagnostics;
     };
-  }, [audioActiveInput, audioBackendError, audioInputDevices, audioLastFrame, audioMeters, audioPanel, audioPendingInput, audioStatus, compute3d, controls, fps, frame, liveConfig, liveDiagnostics, midiActiveInputId, midiInputs, midiLearningKey, midiStatus, overlay, profileGpu, savedSettings, selectedPresetId, selectedSettingsId, sliderModulations, webgpu]);
+  }, [audioCapture, audioLastFrame, audioMeters, audioPanel, compute3d, controls, fps, frame, liveConfig, liveDiagnostics, midiActiveInputId, midiInputs, midiLearningKey, midiStatus, overlay, profileGpu, savedSettings, selectedPresetId, selectedSettingsId, sliderModulations, webgpu]);
 
   useEffect(() => {
     const toBase64 = (array: Float32Array): string => {
@@ -2688,13 +2597,13 @@ export function App() {
   // Record / stop a live performance for offline HDR export. Start snapshots nothing itself — the
   // render loop appends one frame per rendered frame while recording is active (see automationRecorder
   // record call in the loop). Stop serializes the buffer and downloads it for tools/hdr-export.
-  // The audio stream to record: prefer the live reactive mic/loopback stream (perfect sync, no extra
+  // The audio stream to record: prefer the live browser-audio stream (perfect sync, no extra
   // permission), fall back to a held own-capture stream, else acquire one. getUserMedia needs a user
   // gesture only on first acquisition; once cached, MIDI/hotkey starts reuse it gesture-free.
   const ensureCaptureStream = useCallback(async (): Promise<MediaStream | null> => {
     const live = (s: MediaStream | null | undefined) =>
       s && s.getAudioTracks().some((t) => t.readyState === "live") ? s : null;
-    const mic = live(micControllerRef.current?.getStream());
+    const mic = live(browserAudioControllerRef.current?.getStream());
     if (mic) return mic;
     const own = live(ownCaptureStreamRef.current);
     if (own) return own;
@@ -3147,11 +3056,7 @@ export function App() {
               live: liveDiagnostics,
               controls,
               audio: {
-                status: audioStatus,
-                activeInput: audioActiveInput,
-                pendingInput: audioPendingInput,
-                inputs: audioInputDevices,
-                error: audioBackendError,
+                capture: audioCapture,
                 panel: audioPanel,
                 meters: audioMeters,
                 lastSequence: audioLastFrame?.sequence ?? null,
@@ -3484,21 +3389,19 @@ export function App() {
         </ControlGroup>
 
         <AudioPanel
-          status={audioStatus}
+          capture={audioCapture}
           meters={audioMeters}
           panel={audioPanel}
-          inputDevices={audioInputDevices}
-          activeInput={audioActiveInput}
-          error={audioBackendError}
-          lastSequence={audioLastFrame?.sequence ?? null}
-          onInputChange={(input) => {
-            audioPendingInputRef.current = input;
-            setAudioPendingInput(input);
-            setAudioActiveInput(input);
-            setAudioBackendError(null);
-            audioSocketControllerRef.current?.setInput(input);
+          onCaptureToggle={() => {
+            const controller = browserAudioControllerRef.current;
+            if (!controller) return;
+            if (audioCapture.status === "running" || audioCapture.status === "starting") {
+              controller.stop();
+            } else {
+              void controller.start(audioCapture.activeDeviceId ?? undefined);
+            }
           }}
-          onRefreshInputs={() => audioSocketControllerRef.current?.requestDevices()}
+          onInputChange={(deviceId) => { void browserAudioControllerRef.current?.start(deviceId); }}
           onChange={(next) => {
             audioPanelRef.current = next;
             setAudioPanel(next);
@@ -3530,26 +3433,17 @@ export function App() {
 }
 
 function AudioPanel(props: {
-  status: AudioReactiveSocketStatus;
+  capture: BrowserAudioSnapshot;
   meters: Record<AudioBucket, number>;
   panel: AudioPanelState;
-  inputDevices: AudioInputDeviceInfo[];
-  activeInput: string | null;
-  error: string | null;
-  lastSequence: number | null;
-  onInputChange: (input: string) => void;
-  onRefreshInputs: () => void;
+  onCaptureToggle: () => void;
+  onInputChange: (deviceId: string) => void;
   onChange: (panel: AudioPanelState) => void;
 }) {
-  const [inputMenuOpen, setInputMenuOpen] = useState(false);
-  const inputSelectDisabled = !props.status.connected || props.inputDevices.length === 0;
-  const activeInputLabel = props.activeInput
-    ? audioDeviceLabel(props.inputDevices.find((device) => device.name === props.activeInput) ?? {
-      id: props.activeInput,
-      name: props.activeInput,
-      isDefault: false
-    })
-    : props.status.connected ? "No inputs" : "Disconnected";
+  const captureLive = props.capture.status === "running";
+  const captureStarting = props.capture.status === "starting";
+  const captureUnsupported = props.capture.status === "unsupported";
+  const selectedInput = props.capture.activeDeviceId ?? props.capture.devices[0]?.id ?? "";
   const updateBucket = (bucket: AudioBucket, patch: Partial<AudioPanelState["buckets"][AudioBucket]>) => {
     props.onChange({
       ...props.panel,
@@ -3563,58 +3457,52 @@ function AudioPanel(props: {
     <details className="audio-panel control-group-collapsible" data-testid="audio-panel">
       <summary className="audio-panel-title">
         <span>Audio</span>
-        <strong>{props.status.connected ? "on" : "off"}</strong>
+        <strong data-testid="audio-capture-status" data-state={props.capture.status}>
+          {browserAudioStatusLabel(props.capture.status)}
+        </strong>
       </summary>
-      <div className="audio-input-row">
-        <span>Input</span>
-        <div className="audio-input-picker">
-          <button
-            className="audio-input-button"
-            data-testid="audio-input-select"
-            type="button"
-            aria-haspopup="listbox"
-            aria-expanded={inputMenuOpen}
-            disabled={inputSelectDisabled}
-            onClick={() => {
-              props.onRefreshInputs();
-              setInputMenuOpen((open) => !open);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") setInputMenuOpen(false);
-            }}
-          >
-            <span>{activeInputLabel}</span>
-          </button>
-          {inputMenuOpen && !inputSelectDisabled ? (
-            <div className="audio-input-menu" data-testid="audio-input-menu" role="listbox">
-              {props.inputDevices.map((device) => (
-                <button
-                  key={device.id}
-                  className={device.name === props.activeInput ? "active" : ""}
-                  data-testid={`audio-input-option-${inputName(device.name)}`}
-                  type="button"
-                  role="option"
-                  aria-selected={device.name === props.activeInput}
-                  onClick={() => {
-                    props.onInputChange(device.name);
-                    setInputMenuOpen(false);
-                  }}
-                >
-                  {audioDeviceLabel(device)}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+      <div className="audio-capture-strip">
+        <button
+          className={captureLive ? "audio-capture-toggle active" : "audio-capture-toggle"}
+          data-testid="audio-capture-toggle"
+          type="button"
+          disabled={captureStarting || captureUnsupported}
+          onClick={props.onCaptureToggle}
+        >
+          {captureStarting
+            ? "Starting…"
+            : captureLive
+              ? "Stop microphone"
+              : props.capture.status === "denied" || props.capture.status === "error"
+                ? "Try microphone"
+                : captureUnsupported
+                  ? "Microphone unavailable"
+                  : "Start microphone"}
+        </button>
+        <span>Analyzed on this device</span>
       </div>
-      <input
-        type="hidden"
-        name="audio-input"
-        value={props.activeInput ?? ""}
-      />
-      {props.error ? <div className="audio-input-error" data-testid="audio-input-error">{props.error}</div> : null}
+      {props.capture.error ? <div className="audio-input-error" data-testid="audio-input-error">{props.capture.error}</div> : null}
+      {props.capture.devices.length > 0 ? (
+        <label className="audio-input-row">
+          <span>Input</span>
+          <select
+            className="audio-input-select"
+            data-testid="audio-input-select"
+            name="audio-input"
+            value={selectedInput}
+            disabled={!captureLive}
+            onChange={(event) => props.onInputChange(event.currentTarget.value)}
+          >
+            {props.capture.devices.map((device) => (
+              <option key={device.id} value={device.id}>
+                {device.label}{device.isDefault ? " · default" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <label className="audio-enable-row">
-        <span>Enable</span>
+        <span>Modulation</span>
         <input
           data-testid="audio-enabled"
           type="checkbox"
@@ -3685,9 +3573,17 @@ function AudioPanel(props: {
           </div>
         ))}
       </div>
-      <div className="audio-frame-readout">{props.lastSequence === null ? "..." : props.lastSequence}</div>
     </details>
   );
+}
+
+function browserAudioStatusLabel(status: BrowserAudioStatus): string {
+  if (status === "running") return "Live";
+  if (status === "starting") return "Starting";
+  if (status === "denied") return "Blocked";
+  if (status === "error") return "Error";
+  if (status === "unsupported") return "Unavailable";
+  return "Off";
 }
 
 function MidiPanel(props: {
@@ -3777,15 +3673,6 @@ function MidiPanel(props: {
       </div>
     </details>
   );
-}
-
-function audioDeviceLabel(device: AudioInputDeviceInfo): string {
-  const detail = [
-    device.channels ? `${device.channels}ch` : "",
-    device.sampleRate ? `${Math.round(device.sampleRate / 1000)}k` : "",
-    device.isDefault ? "default" : ""
-  ].filter(Boolean).join(" ");
-  return detail ? `${device.name} ${detail}` : device.name;
 }
 
 function midiInputLabel(input: MidiInputInfo): string {

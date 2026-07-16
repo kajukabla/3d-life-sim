@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   audioMicFromLaunch,
-  audioReactiveUrlFromLaunch,
   chooseBootSettingsId,
-  defaultAudioReactiveWsUrl,
   demoLaunchFromSearch,
   parallelPipelinesFromLaunch
 } from "./launchOptions";
@@ -83,10 +81,13 @@ describe("audioMicFromLaunch", () => {
     expect(audioMicFromLaunch("?audio=mic")).toBe(true);
   });
 
-  it("other audio values do not (standalone)", () => {
+  it("keeps normal standalone startup quiet until the user opts in", () => {
     expect(audioMicFromLaunch("")).toBe(false);
-    expect(audioMicFromLaunch("?audio=1")).toBe(false);
     expect(audioMicFromLaunch("?audio=0")).toBe(false);
+  });
+
+  it("treats the legacy ?audio=1 value as browser microphone mode", () => {
+    expect(audioMicFromLaunch("?audio=1")).toBe(true);
   });
 
   it("embedded mode (?embed=1 from the bay scheduler) defaults to mic with no audio param", () => {
@@ -94,26 +95,11 @@ describe("audioMicFromLaunch", () => {
     expect(audioMicFromLaunch("?embed=1&mode=viewer&demo=instant")).toBe(true);
   });
 
-  it("embedded mode treats an explicit ?audio=1 as mic too — the helper is never reachable from a visitor", () => {
+  it("embedded mode treats an explicit ?audio=1 as browser audio too", () => {
     expect(audioMicFromLaunch("?embed=1&audio=1")).toBe(true);
   });
 
   it("?audio=0 disables audio entirely, embedded or not", () => {
     expect(audioMicFromLaunch("?embed=1&audio=0")).toBe(false);
-  });
-});
-
-describe("audioReactiveUrlFromLaunch — the Rust helper WebSocket", () => {
-  it("?audio=mic never opens the helper WebSocket, even with the env default on", () => {
-    expect(audioReactiveUrlFromLaunch("?audio=mic", { VITE_AUDIO_REACTIVE_DEFAULT: "1" })).toBeNull();
-  });
-
-  it("embedded mode never opens the helper WebSocket regardless of params or env default", () => {
-    expect(audioReactiveUrlFromLaunch("?embed=1", { VITE_AUDIO_REACTIVE_DEFAULT: "1" })).toBeNull();
-    expect(audioReactiveUrlFromLaunch("?embed=1&audio=1", { VITE_AUDIO_REACTIVE_DEFAULT: "1" })).toBeNull();
-  });
-
-  it("standalone ?audio=1 still uses the WebSocket backend", () => {
-    expect(audioReactiveUrlFromLaunch("?audio=1", {})).toBe(defaultAudioReactiveWsUrl);
   });
 });

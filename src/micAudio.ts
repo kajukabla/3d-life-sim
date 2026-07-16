@@ -1,229 +1,264 @@
-import type { AudioAnalysisFrame } from "./audioReactive";
+import audioWorkletUrl from "./micAudioWorklet.ts?worker&url";
+import { parseAudioAnalysisFrame, type AudioAnalysisFrame } from "./audioReactive";
 
-// In-browser microphone analyzer for the website embed: replicates the native Rust
-// backend's default Filterbank mode (crates/audio_analysis) so the same presets drive
-// the same slider modulation without the helper download. Per band: one-pole
-// highpass (input minus low-passed input) into a one-pole lowpass, magnitude =
-// max(peak, rms) of the filtered window, mapped through the same dB floor/ceiling.
+export {
+  MicFilterbank,
+  dbToUnit,
+  defaultMicAnalysisOptions,
+  linearToDb,
+  type MicAnalysisOptions,
+  type MicBandConfig
+} from "./micAudioDsp";
 
-const MIN_DB_MAGNITUDE = 1e-9;
+export type BrowserAudioStatus = "idle" | "starting" | "running" | "denied" | "error" | "unsupported";
 
-export type MicBandConfig = { name: string; minHz: number; maxHz: number };
-
-export type MicAnalysisOptions = {
-  floorDb: number;
-  ceilingDb: number;
-  peakFloorDb: number;
-  peakCeilingDb: number;
-  bands: MicBandConfig[];
+export type BrowserAudioInput = {
+  id: string;
+  label: string;
+  isDefault: boolean;
 };
 
-export const defaultMicAnalysisOptions: MicAnalysisOptions = {
-  floorDb: -72,
-  ceilingDb: -12,
-  peakFloorDb: -72,
-  peakCeilingDb: -6,
-  bands: [
-    { name: "low", minHz: 25, maxHz: 180 },
-    { name: "mid", minHz: 180, maxHz: 2000 },
-    { name: "high", minHz: 2000, maxHz: 12000 }
-  ]
+export type BrowserAudioSnapshot = {
+  status: BrowserAudioStatus;
+  devices: BrowserAudioInput[];
+  activeDeviceId: string | null;
+  error: string | null;
+  frameCount: number;
+  lastSequence: number | null;
 };
 
-export function linearToDb(value: number): number {
-  return 20 * Math.log10(Math.max(value, MIN_DB_MAGNITUDE));
-}
-
-export function dbToUnit(db: number, floorDb: number, ceilingDb: number): number {
-  if (!(Number.isFinite(db) && Number.isFinite(floorDb) && Number.isFinite(ceilingDb) && floorDb < ceilingDb)) return 0;
-  const unit = (db - floorDb) / (ceilingDb - floorDb);
-  return Math.min(1, Math.max(0, unit));
-}
-
-class OnePoleLowPass {
-  private alpha: number;
-  private value = 0;
-
-  constructor(cutoffHz: number, sampleRate: number) {
-    const nyquist = sampleRate * 0.5;
-    const clamped = Math.min(Math.max(cutoffHz, 1), Math.max(nyquist * 0.98, 1));
-    const alpha = 1 - Math.exp((-2 * Math.PI * clamped) / sampleRate);
-    this.alpha = Math.min(Math.max(alpha, 0), 1);
-  }
-
-  process(sample: number): number {
-    this.value += (sample - this.value) * this.alpha;
-    return this.value;
-  }
-}
-
-type BandState = {
-  config: MicBandConfig;
-  highpassSource: OnePoleLowPass | null;
-  lowpass: OnePoleLowPass | null;
-};
-
-export class MicFilterbank {
-  private readonly sampleRate: number;
-  private readonly options: MicAnalysisOptions;
-  private readonly bands: BandState[];
-
-  constructor(sampleRate: number, options: MicAnalysisOptions = defaultMicAnalysisOptions) {
-    this.sampleRate = sampleRate;
-    this.options = options;
-    const nyquist = sampleRate * 0.5;
-    this.bands = options.bands.map((config) => ({
-      config,
-      highpassSource: config.minHz > 0 ? new OnePoleLowPass(config.minHz, sampleRate) : null,
-      lowpass: config.maxHz < nyquist * 0.98 ? new OnePoleLowPass(config.maxHz, sampleRate) : null
-    }));
-  }
-
-  // Analyze one contiguous window of samples. Filter state persists across calls
-  // (the mic stream is continuous); per-window accumulators reset every call.
-  analyzeWindow(samples: Float32Array, sequence: number, timestampSec: number): AudioAnalysisFrame {
-    const count = Math.max(samples.length, 1);
-    let inputSumSquares = 0;
-    let inputPeak = 0;
-    const sums = new Float64Array(this.bands.length);
-    const peaks = new Float64Array(this.bands.length);
-
-    for (let i = 0; i < samples.length; i++) {
-      const raw = samples[i];
-      const sample = Number.isFinite(raw) ? raw : 0;
-      inputSumSquares += sample * sample;
-      const mag = Math.abs(sample);
-      if (mag > inputPeak) inputPeak = mag;
-      for (let b = 0; b < this.bands.length; b++) {
-        const band = this.bands[b];
-        let value = sample;
-        if (band.highpassSource) value -= band.highpassSource.process(sample);
-        if (band.lowpass) value = band.lowpass.process(value);
-        sums[b] += value * value;
-        const filteredMag = Math.abs(value);
-        if (filteredMag > peaks[b]) peaks[b] = filteredMag;
-      }
-    }
-
-    const rmsDb = linearToDb(Math.sqrt(inputSumSquares / count));
-    const peakDb = linearToDb(inputPeak);
-
-    const bands: AudioAnalysisFrame["bands"] = {};
-    for (let b = 0; b < this.bands.length; b++) {
-      const magnitude = Math.max(peaks[b], Math.sqrt(sums[b] / count));
-      const rawDb = linearToDb(magnitude);
-      bands[this.bands[b].config.name] = {
-        value: dbToUnit(rawDb, this.options.floorDb, this.options.ceilingDb),
-        rawDb,
-        rawMagnitude: magnitude
-      };
-    }
-
-    return {
-      version: 1,
-      sequence,
-      timestampSec,
-      sampleRate: this.sampleRate,
-      rms: dbToUnit(rmsDb, this.options.floorDb, this.options.ceilingDb),
-      peak: dbToUnit(peakDb, this.options.peakFloorDb, this.options.peakCeilingDb),
-      rmsDb,
-      peakDb,
-      bands
-    };
-  }
-}
-
-export type MicAudioStatus = "starting" | "running" | "denied" | "error";
-
-export type MicAudioController = {
+export type BrowserAudioController = {
+  start: (deviceId?: string) => Promise<void>;
   stop: () => void;
-  // The live input MediaStream (null until getUserMedia resolves, or after stop). Exposed so a
-  // performance recorder can capture the exact audio that drives reactivity — see
-  // performanceAudioRecorder.ts.
+  destroy: () => void;
+  refreshDevices: () => Promise<void>;
   getStream: () => MediaStream | null;
+  snapshot: () => BrowserAudioSnapshot;
 };
 
-const MIC_WINDOW_SIZE = 2048;
-const MIC_EMIT_INTERVAL_MS = 33;
+export type BrowserAudioDependencies = {
+  mediaDevices: MediaDevices;
+  createContext: () => AudioContext;
+  createWorkletNode: (context: AudioContext, processorName: string) => AudioWorkletNode;
+  workletUrl: string;
+};
 
-export function startMicAudio(handlers: {
+type BrowserAudioHandlers = {
   onFrame: (frame: AudioAnalysisFrame, dtSec: number) => void;
-  onStatus?: (status: MicAudioStatus, detail?: string) => void;
-  options?: MicAnalysisOptions;
-}): MicAudioController {
-  const options = handlers.options ?? defaultMicAnalysisOptions;
-  let stopped = false;
+  onState?: (snapshot: BrowserAudioSnapshot) => void;
+};
+
+const maxBrowserAudioInputs = 64;
+const maxDeviceLabelChars = 160;
+
+export function createBrowserAudio(
+  handlers: BrowserAudioHandlers,
+  injectedDependencies?: BrowserAudioDependencies
+): BrowserAudioController {
+  const dependencies = injectedDependencies ?? defaultBrowserAudioDependencies();
+  let state: BrowserAudioSnapshot = {
+    status: dependencies ? "idle" : "unsupported",
+    devices: [],
+    activeDeviceId: null,
+    error: dependencies ? null : "This browser does not support AudioWorklet microphone capture.",
+    frameCount: 0,
+    lastSequence: null
+  };
+  let generation = 0;
+  let destroyed = false;
   let stream: MediaStream | null = null;
   let context: AudioContext | null = null;
-  let timer: number | null = null;
-  let removeResumeListeners: (() => void) | null = null;
+  let source: MediaStreamAudioSourceNode | null = null;
+  let worklet: AudioWorkletNode | null = null;
+  let silentGain: GainNode | null = null;
+  let previousTimestamp: number | null = null;
 
-  handlers.onStatus?.("starting");
+  const publish = (patch: Partial<BrowserAudioSnapshot>) => {
+    state = { ...state, ...patch };
+    handlers.onState?.(snapshot());
+  };
 
-  (async () => {
+  const refreshDevices = async () => {
+    if (!dependencies || destroyed) return;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        // Music-reactive use wants the raw signal: browser voice processing would
-        // squash the dynamics the band mapping feeds on.
-        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      const available = await dependencies.mediaDevices.enumerateDevices();
+      const devices = available
+        .filter((device) => device.kind === "audioinput" && device.deviceId)
+        .slice(0, maxBrowserAudioInputs)
+        .map((device, index) => ({
+          id: device.deviceId,
+          label: boundedLabel(device.label) || `Microphone ${index + 1}`,
+          isDefault: device.deviceId === "default"
+        }));
+      publish({ devices });
+    } catch {
+      // Device enumeration is supplemental; an active stream can continue without it.
+    }
+  };
+
+  const handleDeviceChange = () => { void refreshDevices(); };
+  dependencies?.mediaDevices.addEventListener?.("devicechange", handleDeviceChange);
+
+  const teardownGraph = () => {
+    worklet?.port.close();
+    worklet?.disconnect();
+    source?.disconnect();
+    silentGain?.disconnect();
+    stream?.getTracks().forEach((track) => track.stop());
+    void context?.close();
+    stream = null;
+    context = null;
+    source = null;
+    worklet = null;
+    silentGain = null;
+    previousTimestamp = null;
+  };
+
+  const start = async (deviceId?: string) => {
+    if (!dependencies || destroyed) {
+      publish({
+        status: "unsupported",
+        error: "This browser does not support AudioWorklet microphone capture."
+      });
+      return;
+    }
+    const currentGeneration = ++generation;
+    teardownGraph();
+    publish({ status: "starting", error: null, frameCount: 0, lastSequence: null });
+
+    let nextStream: MediaStream;
+    try {
+      nextStream = await dependencies.mediaDevices.getUserMedia({
+        audio: {
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+          channelCount: 1,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
       });
     } catch (error) {
-      handlers.onStatus?.("denied", error instanceof Error ? error.message : String(error));
+      if (currentGeneration !== generation || destroyed) return;
+      const denied = error instanceof DOMException
+        ? error.name === "NotAllowedError" || error.name === "SecurityError"
+        : error instanceof Error && (error.name === "NotAllowedError" || error.name === "SecurityError");
+      publish({
+        status: denied ? "denied" : "error",
+        error: denied ? "Microphone permission was denied." : browserAudioError(error)
+      });
       return;
     }
-    if (stopped) {
-      stream.getTracks().forEach((track) => track.stop());
+    if (currentGeneration !== generation || destroyed) {
+      nextStream.getTracks().forEach((track) => track.stop());
       return;
     }
+
+    let nextContext: AudioContext | null = null;
     try {
-      context = new AudioContext();
-      const source = context.createMediaStreamSource(stream);
-      const analyser = context.createAnalyser();
-      analyser.fftSize = MIC_WINDOW_SIZE;
-      source.connect(analyser);
-
-      // Autoplay policy can leave a no-gesture AudioContext suspended; resume on
-      // the first real interaction.
-      if (context.state === "suspended") {
-        void context.resume();
-        const resume = () => { void context?.resume(); };
-        window.addEventListener("pointerdown", resume);
-        window.addEventListener("keydown", resume);
-        removeResumeListeners = () => {
-          window.removeEventListener("pointerdown", resume);
-          window.removeEventListener("keydown", resume);
-        };
+      nextContext = dependencies.createContext();
+      await nextContext.audioWorklet.addModule(dependencies.workletUrl);
+      if (currentGeneration !== generation || destroyed) {
+        nextStream.getTracks().forEach((track) => track.stop());
+        void nextContext.close();
+        return;
       }
+      const nextSource = nextContext.createMediaStreamSource(nextStream);
+      const nextWorklet = dependencies.createWorkletNode(nextContext, "life-audio-analyzer");
+      const nextSilentGain = nextContext.createGain();
+      nextSilentGain.gain.value = 0;
+      nextSource.connect(nextWorklet);
+      nextWorklet.connect(nextSilentGain);
+      nextSilentGain.connect(nextContext.destination);
+      nextWorklet.port.onmessage = (event: MessageEvent<unknown>) => {
+        const frame = parseAudioAnalysisFrame(event.data);
+        if (!frame || currentGeneration !== generation || destroyed) return;
+        const dtSec = previousTimestamp === null
+          ? 1 / 60
+          : Math.min(1, Math.max(0.001, frame.timestampSec - previousTimestamp));
+        previousTimestamp = frame.timestampSec;
+        state = {
+          ...state,
+          frameCount: state.frameCount + 1,
+          lastSequence: frame.sequence
+        };
+        handlers.onFrame(frame, dtSec);
+      };
+      nextWorklet.port.start();
+      if (nextContext.state === "suspended") await nextContext.resume();
 
-      const filterbank = new MicFilterbank(context.sampleRate, options);
-      const buffer = new Float32Array(MIC_WINDOW_SIZE);
-      let sequence = 0;
-      let lastEmitMs = performance.now();
-      const startedMs = lastEmitMs;
-      handlers.onStatus?.("running");
-      timer = window.setInterval(() => {
-        if (!context || context.state !== "running") return;
-        analyser.getFloatTimeDomainData(buffer);
-        const nowMs = performance.now();
-        const dtSec = Math.max((nowMs - lastEmitMs) / 1000, 0.001);
-        lastEmitMs = nowMs;
-        sequence += 1;
-        handlers.onFrame(filterbank.analyzeWindow(buffer, sequence, (nowMs - startedMs) / 1000), dtSec);
-      }, MIC_EMIT_INTERVAL_MS);
+      stream = nextStream;
+      context = nextContext;
+      source = nextSource;
+      worklet = nextWorklet;
+      silentGain = nextSilentGain;
+      const trackDeviceId = nextStream.getAudioTracks()[0]?.getSettings().deviceId;
+      publish({
+        status: "running",
+        activeDeviceId: trackDeviceId || deviceId || null,
+        error: null
+      });
+      await refreshDevices();
     } catch (error) {
-      handlers.onStatus?.("error", error instanceof Error ? error.message : String(error));
+      nextStream.getTracks().forEach((track) => track.stop());
+      void nextContext?.close();
+      if (currentGeneration !== generation || destroyed) return;
+      teardownGraph();
+      publish({ status: "error", error: browserAudioError(error) });
     }
-  })();
-
-  return {
-    stop: () => {
-      stopped = true;
-      if (timer !== null) window.clearInterval(timer);
-      removeResumeListeners?.();
-      stream?.getTracks().forEach((track) => track.stop());
-      void context?.close();
-      stream = null;
-    },
-    getStream: () => stream
   };
+
+  const stop = () => {
+    generation += 1;
+    teardownGraph();
+    publish({ status: dependencies ? "idle" : "unsupported", error: null, frameCount: 0, lastSequence: null });
+  };
+
+  const destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
+    generation += 1;
+    teardownGraph();
+    dependencies?.mediaDevices.removeEventListener?.("devicechange", handleDeviceChange);
+  };
+
+  function snapshot(): BrowserAudioSnapshot {
+    return {
+      ...state,
+      devices: state.devices.map((device) => ({ ...device }))
+    };
+  }
+
+  return { start, stop, destroy, refreshDevices, getStream: () => stream, snapshot };
+}
+
+function defaultBrowserAudioDependencies(): BrowserAudioDependencies | null {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof AudioContext === "undefined" || typeof AudioWorkletNode === "undefined") {
+    return null;
+  }
+  return {
+    mediaDevices: navigator.mediaDevices,
+    createContext: () => new AudioContext({ latencyHint: "interactive" }),
+    createWorkletNode: (context, processorName) => new AudioWorkletNode(context, processorName, {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+      channelCount: 1,
+      channelCountMode: "explicit"
+    }),
+    workletUrl: audioWorkletUrl
+  };
+}
+
+function boundedLabel(value: string): string {
+  return Array.from(value)
+    .slice(0, maxDeviceLabelChars)
+    .join("")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function browserAudioError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return boundedLabel(message) || "Microphone capture could not start.";
 }
