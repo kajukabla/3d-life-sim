@@ -38,7 +38,6 @@ import {
 import { rayForNdc, worldToCamera, focalToFocus, focusToFocal, type CameraMath3d, type Vec3 } from "./cameraMath3d";
 import { TIMELINE_FPS, TIMELINE_TOTAL_FRAMES, advanceFrame, normalizeLoop, planSeek, type TimelineState } from "./timeline";
 import { useTimelineTransport } from "./useTimelineTransport";
-import { TimelineBar } from "./TimelineBar";
 import { createCameraRecorder, type CameraPose } from "./cameraRecorder";
 import { audioMicFromLaunch, audioReactiveUrlFromLaunch, chooseBootSettingsId, demoLaunchFromSearch, embedFromLaunch, parallelPipelinesFromLaunch, shouldStartPlaying } from "./launchOptions";
 import { startMicAudio, type MicAudioStatus, type MicAudioController } from "./micAudio";
@@ -78,8 +77,7 @@ import {
   midiMappingMatches,
   midiMessageIndexKeys,
   parseMidiControlMessage,
-  type MidiControlMessage,
-  type SliderMidiMapping
+  type MidiControlMessage
 } from "./midiMapping";
 import { selectDemoDriftCandidates, DEMO_DRIFT_DENYLIST } from "./demoDrift";
 import { controlHint } from "./controlHints";
@@ -1029,7 +1027,6 @@ export function App() {
   const cameraRecorderRef = useRef(createCameraRecorder());
   // Performance recorder for offline HDR export (see automationRecorder.ts + tools/hdr-export).
   const automationRecorderRef = useRef(createAutomationRecorder());
-  const [recordingPerformance, setRecordingPerformance] = useState(false);
   // Real-time audio capture alongside the performance data: the visuals are replayed offline for HDR,
   // but the audio is recorded live and muxed onto the render afterward (see performanceAudioRecorder.ts).
   const performanceAudioRecorderRef = useRef(createPerformanceAudioRecorder());
@@ -1038,20 +1035,7 @@ export function App() {
   // A fallback capture stream acquired on demand when not in mic mode (held so a later MIDI/hotkey
   // start needs no fresh permission gesture).
   const ownCaptureStreamRef = useRef<MediaStream | null>(null);
-  const [audioCaptured, setAudioCaptured] = useState(false);
-  // MIDI mapping for the single record toggle: map one pad/button so one press starts and the next
-  // stops. Edge-triggered (fires on the rising edge of a press), kept in refs so the MIDI handler —
-  // defined before togglePerformanceRecording — reads current values without re-subscribing.
-  const [recordMidiMapping, setRecordMidiMapping] = useState<SliderMidiMapping | null>(null);
-  const [recordMidiLearning, setRecordMidiLearning] = useState(false);
-  const recordMidiMappingRef = useRef<SliderMidiMapping | null>(null);
-  const recordMidiLearningRef = useRef(false);
-  const recordMidiPrevHighRef = useRef(false);
   const togglePerformanceRecordingRef = useRef<() => void>(() => {});
-  // Constrain the live canvas to a 9:16 box so portrait takes are composed (camera framing) and
-  // recorded in the aspect they'll be posted in. Render width follows the canvas CSS box, so this
-  // alone makes the live render, camera, and recording header all portrait — see tools/hdr-export.
-  const [portraitMode, setPortraitMode] = useState(false);
   // While a replay-export driver is driving the renderer via __fluoddityReplayFrame, the live RAF
   // loop must stand down so it doesn't fight the deterministic replay. replayPrevTimestepRef tracks
   // the sim timestep between replay frames so we step by the exact recorded delta.
@@ -1405,21 +1389,6 @@ export function App() {
       applyMidiMessageToSlider(key, config, message);
     }
 
-    // Record-toggle pad. In learn mode the next message becomes the binding; otherwise a rising edge
-    // (press past the half-way point, having been below it) toggles recording once — so press = start,
-    // next press = stop, and the matching note-off/release doesn't double-fire.
-    if (recordMidiLearningRef.current) {
-      const mapping = midiMappingFromControl(message, 0, 1);
-      recordMidiMappingRef.current = mapping;
-      recordMidiLearningRef.current = false;
-      recordMidiPrevHighRef.current = message.value > 0.5;
-      setRecordMidiMapping(mapping);
-      setRecordMidiLearning(false);
-    } else if (recordMidiMappingRef.current && midiMappingMatches(recordMidiMappingRef.current, message)) {
-      const high = message.value > 0.5;
-      if (high && !recordMidiPrevHighRef.current) togglePerformanceRecordingRef.current();
-      recordMidiPrevHighRef.current = high;
-    }
   }, [applyMidiMessageToSlider, updateSliderModulationConfig]);
 
   const handleMidiData = useCallback((inputId: string, inputName: string, data: ArrayLike<number> | null | undefined) => {
@@ -2712,10 +2681,6 @@ export function App() {
     setFrame(0);
   }, []);
 
-  const reset = useCallback(() => {
-    requestLiveReset();
-  }, [requestLiveReset]);
-
   // Record / stop a live performance for offline HDR export. Start snapshots nothing itself — the
   // render loop appends one frame per rendered frame while recording is active (see automationRecorder
   // record call in the loop). Stop serializes the buffer and downloads it for tools/hdr-export.
@@ -2749,7 +2714,6 @@ export function App() {
     if (recorder.isRecording()) {
       const now = performance.now();
       const recording = recorder.stop();
-      setRecordingPerformance(false);
       const audio = await audioRecorder.stop(now);
       const frameCount = recording?.frames.length ?? 0;
       const savedJson = recording ? await savePerformanceRecording(recording) : null;
@@ -2757,31 +2721,19 @@ export function App() {
       if (savedJson || savedAudio) {
         console.info("[3d-life-sim] performance downloaded:", savedJson, savedAudio);
       }
-      setAudioCaptured(false);
     } else {
       const canvas = canvasRef.current;
       const stream = await ensureCaptureStream();
       const now = performance.now();
       recorder.start({ version: 1, width: canvas?.width ?? 0, height: canvas?.height ?? 0 }, now);
-      const started = stream ? audioRecorder.start(stream, now) : false;
-      setAudioCaptured(started);
-      setRecordingPerformance(true);
+      if (stream) audioRecorder.start(stream, now);
     }
   }, [ensureCaptureStream]);
 
-  // Mirror record-toggle state into refs the (earlier-defined) MIDI handler reads, and keep a live
-  // pointer to the latest toggle callback so MIDI/hotkey starts always hit the current closure.
-  useEffect(() => { recordMidiMappingRef.current = recordMidiMapping; }, [recordMidiMapping]);
-  useEffect(() => { recordMidiLearningRef.current = recordMidiLearning; }, [recordMidiLearning]);
+  // Keep a live pointer to the latest callback so the R hotkey always hits the current closure.
   useEffect(() => {
     togglePerformanceRecordingRef.current = () => { void togglePerformanceRecording(); };
   }, [togglePerformanceRecording]);
-
-  const startRecordMidiLearn = useCallback(() => {
-    cancelMidiLearn();                 // a slider learn and the record learn can't both listen at once
-    setRecordMidiLearning(true);
-    void ensureMidiAccess();
-  }, [cancelMidiLearn, ensureMidiAccess]);
 
   const updateLiveConfig = useCallback((patch: Partial<LiveGpu3dConfig>, resetSimulation = false) => {
     setLiveConfig((value) => {
@@ -2896,15 +2848,6 @@ export function App() {
     return () => { delete window.__fluoddityApplyPreset; };
   }, [applySettingsPreset]);
 
-  const chooseSavedSettings = useCallback((id: string) => {
-    if (!id) {
-      setSelectedSettingsId("");
-      return;
-    }
-    const settings = savedSettings.find((item) => item.id === id);
-    if (settings) applySettingsPreset(settings);
-  }, [applySettingsPreset, savedSettings]);
-
   // On first load, apply the boot saved-settings preset (full apply, so MIDI/audio mappings load
   // too): `?settings=<name|id>` selects explicitly (the website embed passes ?settings=AR11),
   // otherwise the repo NewDefault/AR10 default. Skipped for automation/profiling
@@ -2948,16 +2891,6 @@ export function App() {
       window.alert(error instanceof Error ? error.message : String(error));
     }
   }, [controls, currentSavedAudio, currentSavedUi, displayMode, liveConfig, savedSettings, selectedPresetId, selectedSettingsId]);
-
-  const deleteCurrentSettings = useCallback(() => {
-    if (!selectedSettingsId) return;
-    const settings = savedSettings.find((item) => item.id === selectedSettingsId);
-    if (!settings || settings.fileBacked) return;
-    const next = savedSettings.filter((item) => item.id !== selectedSettingsId);
-    persistSavedSettings(next);
-    setSavedSettings(next);
-    setSelectedSettingsId("");
-  }, [savedSettings, selectedSettingsId]);
 
   const exportCurrentSettings = useCallback(async () => {
     const existing = savedSettings.find((item) => item.id === selectedSettingsId);
@@ -3009,42 +2942,6 @@ export function App() {
     }
   }, [importSettingsFile]);
 
-  const randomizeAllParameters = useCallback(() => {
-    const currentConfig = liveConfigRef.current;
-    const nextConfig = normalizeTrailKernel({
-      ...currentConfig,
-      ruleSeed: Math.random(),
-      depositMass: randomSliderValue(liveSliderRanges.depositMass),
-      depositRadius: randomSliderValue({
-        ...trailRadiusSliderRange,
-        max: maxSupportedTrailRadius(currentConfig)
-      }),
-      trailPersistence: randomSliderValue(liveSliderRanges.trailPersistence),
-      trailDiffusion: randomSliderValue(liveSliderRanges.trailDiffusion),
-      sensorGain: randomSliderValue(liveSliderRanges.sensorGain),
-      sensorAngle: randomSliderValue(liveSliderRanges.sensorAngle),
-      sensorDistance: randomSliderValue(liveSliderRanges.sensorDistance),
-      mutationScale: randomSliderValue(liveSliderRanges.mutationScale),
-      drag: randomSliderValue(liveSliderRanges.drag),
-      axialForce: randomSliderValue(liveSliderRanges.axialForce),
-      lateralForce: randomSliderValue(liveSliderRanges.lateralForce),
-      globalForceMult: randomSliderValue(liveSliderRanges.globalForceMult),
-      strafePower: randomSliderValue(liveSliderRanges.strafePower),
-      strafeMomentum: randomSliderValue(liveSliderRanges.strafeMomentum),
-      hazardRate: randomSliderValue(liveSliderRanges.hazardRate),
-      initialConditions: randomChoice([0, 2, 4, 5, 6, 7, 8] as const),
-      boundaryMode: randomChoice([0, 1, 2, 3, 4, 5, 6] as const),
-      domainShape: randomChoice([0, 1, 2, 3] as const),
-      absoluteOrientation: randomChoice([0, 1, 2, 3, 4, 5] as const),
-      orientationMix: randomSliderValue(liveSliderRanges.orientationMix),
-      symmetryAxes: randomChoice([0, 1, 2, 3, 4, 5, 6, 7] as const)
-    });
-    setSelectedSettingsId("");
-    liveConfigRef.current = nextConfig;
-    setLiveConfig(nextConfig);
-    requestLiveReset();
-  }, [requestLiveReset]);
-
   const setCameraTarget = useCallback((patch: Partial<Pick<OrbitCamera, "yaw" | "pitch" | "distance" | "panX" | "panY">>, immediate = false) => {
     const camera = cameraRef.current;
     const nextYaw = normalizeAngle(patch.yaw ?? camera.targetYaw);
@@ -3073,10 +2970,6 @@ export function App() {
       cameraPanY: nextPanY
     }));
   }, []);
-
-  const resetView = useCallback(() => {
-    setCameraTarget({ yaw: cameraDefaults.yaw, pitch: cameraDefaults.pitch, distance: cameraDefaults.distance, panX: 0, panY: 0 }, true);
-  }, [setCameraTarget]);
 
   const beginTumble = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (viewLockedRef.current) return;
@@ -3256,7 +3149,7 @@ export function App() {
   return (
     <SliderModulationContext.Provider value={sliderModulationContext}>
       <main ref={appShellRef} className={`app-shell${panelOpen ? "" : " panel-collapsed"}${cursorIdle ? " cursor-idle" : ""}`}>
-      <section className={`viewport-band${portraitMode ? " is-portrait" : ""}`} data-testid="viewport-band">
+      <section className="viewport-band" data-testid="viewport-band">
         <canvas
           ref={canvasRef}
           className={`simulation-canvas${dragMode === "orbit" ? " is-tumbling" : dragMode === "pan" ? " is-panning" : ""}`}
@@ -3316,63 +3209,13 @@ export function App() {
       </section>
 
       <aside id="control-panel" className="control-panel" data-testid="control-panel" aria-label="3D Life cockpit controls">
-        <div className="panel-row button-row">
-          <button data-testid="play-toggle" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play"}</button>
-          <button data-testid="timeline-toggle" className={timelineEnabled ? "active" : ""} onClick={() => setTimelineEnabled((value) => !value)}>{timelineEnabled ? "Timeline: On" : "Timeline: Off"}</button>
-          <button data-testid="reset" onClick={reset}>Reset</button>
-          <button data-testid="reset-view" onClick={resetView}>Reset View</button>
-          <button data-testid="render-preview" onClick={() => setOverlay((value) => !value)}>Render Preview</button>
-          <button
-            className={portraitMode ? "active" : ""}
-            data-testid="portrait-mode"
-            onClick={() => setPortraitMode((value) => !value)}
-            title="Frame the canvas as 9:16 portrait so the live composition and recording match Instagram"
-          >
-            {portraitMode ? "Portrait 9:16: On" : "Portrait 9:16"}
-          </button>
-          <button
-            className={recordingPerformance ? "active" : ""}
-            data-testid="record-performance"
-            onClick={() => void togglePerformanceRecording()}
-            title="Record this live performance + audio (or press R) to re-render as HDR video offline"
-          >
-            {recordingPerformance
-              ? `● Stop Recording${audioCaptured ? " (+audio)" : ""}`
-              : "Record Performance"}
-          </button>
-          <button
-            className={recordMidiLearning ? "active" : ""}
-            data-testid="record-midi-learn"
-            onClick={() => (recordMidiLearning ? setRecordMidiLearning(false) : startRecordMidiLearn())}
-            title="MIDI-map the record toggle to a single pad/button (press to learn, then hit a pad)"
-          >
-            {recordMidiLearning
-              ? "Listening… press a pad"
-              : recordMidiMapping?.control
-                ? `Rec MIDI: ${midiControlLabel(recordMidiMapping.control)}`
-                : "MIDI-map Rec"}
-          </button>
-          <button className="wide-button" data-testid="randomize-all" onClick={randomizeAllParameters}>Randomize all parameters</button>
-        </div>
-
-        {timelineEnabled && (
-          <TimelineBar
-            state={timeline}
-            onTogglePlay={() => setPlaying((value) => !value)}
-            onScrub={(targetFrame) => timelineDispatch({ type: "scrub", frame: targetFrame })}
-            onSetLoop={(loopIn, loopOut) => timelineDispatch({ type: "set-loop", loopIn, loopOut })}
-            onSetSpeed={(speed) => timelineDispatch({ type: "set-speed", speed })}
-          />
-        )}
-
         <PresetSelect value={selectedPresetId} onChange={applyPreset} />
         <ControlGroup title="Settings">
-          <SavedSettingsSelect value={selectedSettingsId} settings={savedSettings} onChange={chooseSavedSettings} />
           <div className="settings-actions">
-            <button data-testid="save-settings" onClick={saveCurrentSettings}>Save</button>
+            <button className="settings-primary-action" data-testid="play-toggle" onClick={() => setPlaying((value) => !value)}>{playing ? "Pause" : "Play"}</button>
+            <button data-testid="save-settings" onClick={saveCurrentSettings}>Save preset</button>
             <button data-testid="export-settings" onClick={exportCurrentSettings}>Export JSON</button>
             <button data-testid="import-settings" onClick={openSettingsJson}>Load JSON</button>
-            <button data-testid="delete-settings" onClick={deleteCurrentSettings} disabled={!selectedSettingsId || savedSettings.find((settings) => settings.id === selectedSettingsId)?.fileBacked === true}>Delete</button>
           </div>
           <input
             ref={jsonInputRef}
@@ -4384,25 +4227,6 @@ function PresetSelect(props: { value: string; onChange: (value: string) => void 
         ))}
       </select>
       <output />
-    </label>
-  );
-}
-
-function SavedSettingsSelect(props: {
-  value: string;
-  settings: SavedSettingsPreset[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="control-row">
-      <span title={controlHint("Saved")}>Saved</span>
-      <select data-testid="saved-settings-select" name="saved-settings" value={props.value} onChange={(event) => props.onChange(event.target.value)}>
-        <option value="">Current</option>
-        {props.settings.map((settings) => (
-          <option key={settings.id} value={settings.id}>{settings.name}</option>
-        ))}
-      </select>
-      <output>{props.settings.length}</output>
     </label>
   );
 }
@@ -5693,20 +5517,6 @@ function clampRaySteps(value: number): number {
 
 function clampSimulationSpeed(value: number): number {
   return clamp(Number.isFinite(value) ? value : defaultLiveGpu3dConfig.simulationSpeed, 0, MAX_SIMULATION_SPEED);
-}
-
-function randomSliderValue(range: SliderRange): number {
-  const steps = Math.round((range.max - range.min) / range.step);
-  const value = range.min + Math.floor(Math.random() * (steps + 1)) * range.step;
-  return Number(clamp(value, range.min, range.max).toFixed(stepPrecision(range.step)));
-}
-
-function randomBoolean(): boolean {
-  return Math.random() < 0.5;
-}
-
-function randomChoice<T>(values: readonly T[]): T {
-  return values[Math.floor(Math.random() * values.length)];
 }
 
 function stepPrecision(step: number): number {

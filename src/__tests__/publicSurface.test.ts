@@ -22,6 +22,30 @@ describe("public particle-only surface", () => {
     expect(appSource).not.toContain("function CollapsibleGroup");
   });
 
+  it("keeps the cockpit header focused on built-in presets", () => {
+    const settings = appSource.slice(
+      appSource.indexOf('<ControlGroup title="Settings">'),
+      appSource.indexOf('<ControlGroup title="Particles">')
+    );
+
+    expect(appSource).toContain('data-testid="preset-select"');
+    expect(settings).toContain('data-testid="play-toggle"');
+    expect(appSource).not.toContain('data-testid="saved-settings-select"');
+    for (const testId of [
+      "timeline-toggle",
+      "timeline-bar",
+      "reset",
+      "reset-view",
+      "render-preview",
+      "portrait-mode",
+      "record-performance",
+      "record-midi-learn",
+      "randomize-all"
+    ]) {
+      expect(appSource).not.toContain(`data-testid="${testId}"`);
+    }
+  });
+
   it("ends the public cockpit at MIDI", () => {
     expect(appSource).not.toContain('<ControlGroup title="Track">');
     expect(appSource).not.toContain('data-testid="track-release"');

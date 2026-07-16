@@ -83,24 +83,6 @@ select {
   overscroll-behavior: none;
 }
 
-/* Portrait 9:16 compose mode: constrain the canvas to a 9:16 box centered in the band so the live
-   composition (and the recording it captures) match Instagram. Render width follows the canvas CSS
-   box (see resizeCanvasToDisplayResolution), so this is all that's needed to make the live render and
-   camera framing portrait. The band fills black around the pillarboxed canvas. */
-.viewport-band.is-portrait {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #000;
-}
-
-.viewport-band.is-portrait .simulation-canvas {
-  width: auto;
-  height: 100%;
-  max-width: 100%;
-  aspect-ratio: 9 / 16;
-}
-
 .simulation-canvas.is-tumbling {
   cursor: grabbing;
 }
@@ -300,13 +282,6 @@ select {
   pointer-events: none;
 }
 
-.button-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
 button {
   min-height: 36px;
   color: #fff6e8;
@@ -331,10 +306,6 @@ button.active {
   border-color: #d8fff6;
 }
 
-.wide-button {
-  grid-column: 1 / -1;
-}
-
 .settings-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -344,6 +315,10 @@ button.active {
 .settings-actions button {
   min-height: 32px;
   font-size: 12px;
+}
+
+.settings-actions .settings-primary-action {
+  grid-column: 1 / -1;
 }
 
 .hidden-file-input {
@@ -984,31 +959,4 @@ button.active {
   .audio-helper-actions {
     grid-template-columns: 1fr;
   }
-}
-
-.timeline-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  flex-wrap: wrap;
-}
-
-.timeline-bar input[type="range"] {
-  flex: 1 1 60px;
-  min-width: 60px;
-}
-
-.timeline-bar .timeline-readout {
-  font-variant-numeric: tabular-nums;
-  min-width: 72px;
-  text-align: right;
-}
-
-.timeline-bar .timeline-loop {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1 1 100px;
 }
