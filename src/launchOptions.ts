@@ -1,3 +1,5 @@
+import { defaultCuratedPresetId, legacyCuratedPresetIds } from "./curatedPresets";
+
 export const defaultAudioReactiveWsUrl = "ws://127.0.0.1:47831";
 
 type AudioReactiveLaunchEnv = {
@@ -62,17 +64,21 @@ export type BootSettingsCandidate = { id: string; name: string };
 // Which saved-settings preset to apply on boot. `?settings=<name|id>` selects explicitly
 // (unknown name → nothing, preserving the old "?settings skips the default" semantics);
 // `?profileGpu`/`?skipAppCompute` automation skips any default; otherwise the repo
-// NewDefault preset (AR10 fallback).
+// curated Default preset. Legacy file names remain valid for old links.
 export function chooseBootSettingsId(search: string, candidates: BootSettingsCandidate[]): string | null {
   const params = new URLSearchParams(search);
   if (params.has("settings")) {
     const wanted = (params.get("settings") ?? "").trim().toLowerCase();
     if (!wanted) return null;
-    const match = candidates.find((c) => c.id.toLowerCase() === wanted || c.name.trim().toLowerCase() === wanted);
+    const legacyId = legacyCuratedPresetIds[wanted];
+    const match = candidates.find((c) =>
+      c.id.toLowerCase() === wanted ||
+      c.name.trim().toLowerCase() === wanted ||
+      c.id === legacyId
+    );
     return match?.id ?? null;
   }
   if (params.has("profileGpu") || params.has("skipAppCompute")) return null;
-  const def = candidates.find((c) => c.id === "file-newdefault-json" || c.name === "NewDefault")
-    ?? candidates.find((c) => c.id === "file-ar10-json" || c.name === "AR10");
+  const def = candidates.find((c) => c.id === defaultCuratedPresetId);
   return def?.id ?? null;
 }

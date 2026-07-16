@@ -1,0 +1,696 @@
+{
+  "name": "Viridian Aurora",
+  "presetId": "shimmer-orb",
+  "displayMode": "live",
+  "controls": {
+    "bloomStrength": 0.32,
+    "bloomThreshold": 1.55,
+    "bloomRadius": 2.15,
+    "colorSaturation": 1.16,
+    "colorContrast": 1.13,
+    "chromaticAberration": 0.14988091115327273,
+    "vignetteStrength": 0.64,
+    "vignetteSoftness": 0.5,
+    "streakStrength": 0.18,
+    "streakLength": 0.31,
+    "streakVertical": 0.45,
+    "flareHeight": 0,
+    "flareCutoff": 1,
+    "ribbonFraction": 0,
+    "exposure": 1.35,
+    "fov": 97,
+    "aperture": 0.5653028338961303,
+    "focusDistance": 0.54,
+    "dofBlur": 1,
+    "dofEnabled": false,
+    "dofDebug": false,
+    "sceneBrightness": 2.6,
+    "rayResolution": 1560,
+    "particleSizePx": 2.0742259224962725,
+    "particleOpacity": 0.02,
+    "particleBrightness": 4.342904549675189,
+    "particleColorMode": "audio-viridis",
+    "particleVelocityStretch": true,
+    "particleStretch": 0.7,
+    "particleStretchMin": 0,
+    "particleStretchSpeed": 0.004,
+    "particleSpeedCutoff": 0,
+    "particleSlowCutoff": 0,
+    "particleGlowCore": 1,
+    "particleHotCore": 0.01,
+    "particleBlendMode": "additive",
+    "particleDensityCutoff": 0,
+    "particleDensityRadius": 0,
+    "particleDensityNormalize": 0,
+    "particleDensitySoftness": 0.44,
+    "particleSupportMask": 1,
+    "particleSupportRadius": 0.35,
+    "particleSupportNeighbors": 24,
+    "particleSupportFlow": 0.18,
+    "fastParticleRender": true,
+    "fastNoBloomPost": true,
+    "particleTint": "#00ff88",
+    "renderLayer": "particles",
+    "cameraYaw": 0.3162269138928604,
+    "cameraPitch": 0.28,
+    "cameraDistance": 1.6380000000000001,
+    "cameraPanX": -0.16685526196151437,
+    "cameraPanY": 0.03172750722982695,
+    "variationMaster": 1,
+    "variationDrift": 0.8,
+    "variationNoiseMix": 0.76,
+    "variationFreq": 11.25,
+    "variationOctaves": 4,
+    "variationGain": 0.75,
+    "variationLacunarity": 2.7,
+    "variationSizeAmount": 0.83,
+    "variationSizeCurve": 5.931873235199999,
+    "variationSizeMin": 1.27,
+    "variationSizeMax": 3,
+    "variationBrightAmount": 0.88,
+    "variationBrightCurve": 2,
+    "variationBrightMin": 0.75,
+    "variationBrightMax": 2.7,
+    "variationOpacityAmount": 1,
+    "variationOpacityCurve": 0.3,
+    "variationOpacityMin": 0.64,
+    "variationOpacityMax": 1.28,
+    "variationColorAmount": 0,
+    "variationColorCurve": 6,
+    "variationColorMin": -0.08,
+    "variationColorMax": 0.5
+  },
+  "liveConfig": {
+    "seed": 2771361799,
+    "simulationSpeed": 1,
+    "width": 96,
+    "height": 96,
+    "depth": 96,
+    "particleCount": 3399680,
+    "dt": 1,
+    "sensorGain": 0.8500000000000001,
+    "sensorAngle": -0.8,
+    "sensorDistance": -1.45,
+    "mutationScale": 0.335,
+    "globalForceMult": 0.6685420492794356,
+    "drag": 0.24964273345981824,
+    "strafePower": 0.3280335001135245,
+    "axialForce": 0.24,
+    "lateralForce": 0.9,
+    "hazardRate": 0.006782057737000286,
+    "trailPersistence": 0.999,
+    "trailDiffusion": 0.62,
+    "depositRadius": 0.019,
+    "depositTapRadius": 1,
+    "depositMass": 1.8,
+    "sigma": 0.0064600000000000005,
+    "pulseDepth": 0.15,
+    "pulseRate": 3.71,
+    "cohorts": 25,
+    "ruleSeed": 0.4155617116484791,
+    "hueSensitivity": -0.84,
+    "colorByCohort": true,
+    "symmetryAxes": 2,
+    "absoluteOrientation": 3,
+    "orientationMix": 0.36,
+    "initialConditions": 0,
+    "boundaryMode": 2,
+    "domainShape": 0,
+    "rule": [
+      0.2723119259,
+      0.2353467047,
+      -0.3603444695,
+      -0.09512524307,
+      0.6235610247,
+      3.013402939,
+      0.02889615297,
+      0.6329693794,
+      1.528497815,
+      -1.931068063,
+      -0.8994591236,
+      -2.652257919,
+      -0.7968136072,
+      -0.4519242346,
+      -1.252381325,
+      0.9024071097,
+      0.6202709079,
+      -3.089233398,
+      2.700178146,
+      1.030089855,
+      0.2612487674,
+      0.7132430077,
+      -0.5218821764,
+      2.613840342,
+      1.409879804,
+      2.794755459,
+      -2.923718929,
+      -1.810302138,
+      -0.2040163279,
+      -0.01136101782,
+      1.589127541,
+      0.389028132,
+      -0.3837513328,
+      -1.525727987,
+      -1.321027994,
+      -1.264946699,
+      1.761325479,
+      1.837681055,
+      -0.4041278362,
+      0.1539973617,
+      0.08247791231,
+      0.6491791606,
+      0.3635686338,
+      -0.3440827131,
+      -1.007892013,
+      1.137264013,
+      -0.3193916082,
+      -2.485742092,
+      0.334392488,
+      0.7741389275,
+      -1.851560354,
+      0.2410325259,
+      0.4511550665,
+      0.6353343725,
+      -0.4594263434,
+      -1.390197515,
+      0.6367928386,
+      0.1399131566,
+      1.607939243,
+      1.305648565,
+      -0.5525392294,
+      -2.501020193,
+      1.342517853,
+      1.339195728,
+      -0.3298691511,
+      -0.1836149991,
+      0.0783386901,
+      0.3052905798,
+      0.4855825305,
+      -0.991615355,
+      -2.480074883,
+      1.52519834,
+      -0.2139547765,
+      0.07011644542,
+      0.3962416351,
+      0.3858237863,
+      -1.673520684,
+      2.782539606,
+      0.1734578609,
+      2.216310978
+    ],
+    "recycleCutoff": 0,
+    "recycleEnabled": false
+  },
+  "ui": {
+    "playing": true,
+    "overlay": false,
+    "viewLocked": false,
+    "demoMode": true,
+    "frameCap": 60,
+    "cameraOrbit": {
+      "enabled": true,
+      "speed": 0.24
+    },
+    "timeline": {
+      "enabled": false,
+      "state": {
+        "currentFrame": 3599,
+        "playing": true,
+        "loopIn": 0,
+        "loopOut": 3599,
+        "playbackSpeed": 1
+      }
+    },
+    "trackingControls": {
+      "follow": false,
+      "look": false,
+      "followSpeed": 3,
+      "followSmoothing": 1,
+      "lookSpeed": 4,
+      "lookSmoothing": 1,
+      "followDistance": 3.15,
+      "followHeight": 0,
+      "cohesion": 0.5
+    }
+  },
+  "audio": {
+    "panel": {
+      "enabled": true,
+      "buckets": {
+        "low": {
+          "gain": 0.75,
+          "exponent": 8,
+          "attackMs": 5,
+          "decayMs": 147
+        },
+        "mid": {
+          "gain": 0.75,
+          "exponent": 5,
+          "attackMs": 11,
+          "decayMs": 37
+        },
+        "high": {
+          "gain": 1,
+          "exponent": 1,
+          "attackMs": 1,
+          "decayMs": 1
+        }
+      }
+    },
+    "sliders": {
+      "p-bright": {
+        "min": 0,
+        "max": 6.35,
+        "buckets": {
+          "low": {
+            "enabled": true,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "sim-speed-slider": {
+        "min": 0.1,
+        "max": 2,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "trail-amount-slider": {
+        "min": 0.05,
+        "max": 2,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "particle-size-slider": {
+        "min": 1.1,
+        "max": 2.4,
+        "buckets": {
+          "low": {
+            "enabled": true,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "trail-radius-slider": {
+        "min": 0.0015,
+        "max": 0.1,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "mutation": {
+        "min": 0,
+        "max": 0.2,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "fov-slider": {
+        "min": 20,
+        "max": 188,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "orbit-speed-slider": {
+        "min": -1.5,
+        "max": 1.5,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "lateral": {
+        "min": -1,
+        "max": 1,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "mix": {
+        "min": 0,
+        "max": 1,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "axial": {
+        "min": -1,
+        "max": 1,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "particle-color-mode-slider": {
+        "min": 0,
+        "max": 6,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "initial-conditions-slider": {
+        "min": 0,
+        "max": 3,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "boundary-mode-slider": {
+        "min": 0,
+        "max": 2,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "absolute-orientation-slider": {
+        "min": 0,
+        "max": 2,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "force": {
+        "min": -2,
+        "max": 2,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": true,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "pitch": {
+        "min": -1.32,
+        "max": 1.32,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "drag": {
+        "min": -0.2,
+        "max": 0.4,
+        "buckets": {
+          "low": {
+            "enabled": true,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "sensor": {
+        "min": 0,
+        "max": 10,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "angle": {
+        "min": -1,
+        "max": 1,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "distance": {
+        "min": 0,
+        "max": 3,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "camera-zoom-slider": {
+        "min": 0,
+        "max": 25,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "trail-diffusion-slider": {
+        "min": 0,
+        "max": 1,
+        "buckets": {
+          "low": {
+            "enabled": false,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      },
+      "chromatic-aberration-slider": {
+        "min": 0,
+        "max": 0.2,
+        "buckets": {
+          "low": {
+            "enabled": true,
+            "gain": 1
+          },
+          "mid": {
+            "enabled": false,
+            "gain": 1
+          },
+          "high": {
+            "enabled": false,
+            "gain": 1
+          }
+        }
+      }
+    }
+  },
+  "version": 2
+}

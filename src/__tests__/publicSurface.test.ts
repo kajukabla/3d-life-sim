@@ -30,6 +30,9 @@ describe("public particle-only surface", () => {
 
     expect(appSource).toContain('data-testid="preset-select"');
     expect(settings).toContain('data-testid="play-toggle"');
+    expect(settings).toContain('data-testid="save-settings"');
+    expect(settings).toContain('data-testid="import-settings"');
+    expect(settings).not.toContain('data-testid="export-settings"');
     expect(appSource).not.toContain('data-testid="saved-settings-select"');
     for (const testId of [
       "timeline-toggle",
@@ -54,15 +57,30 @@ describe("public particle-only surface", () => {
     expect(appSource).not.toContain('className="preset-json"');
   });
 
-  it("ships the selected particle presets without MIDI mappings", () => {
-    for (const fileName of ["vid1.json", "vid2.json", "AR11.json"]) {
-      const raw = readFileSync(new URL(`../../Presets/${fileName}`, import.meta.url), "utf8");
-      const preset = JSON.parse(raw) as { controls?: { renderLayer?: string; ribbonFraction?: number } };
+  it("ships only the renamed curated presets without MIDI mappings or camera locks", () => {
+    const files = new Map([
+      ["default.json", "Default"],
+      ["electric-current.json", "Electric Current"],
+      ["ice-flower.json", "Ice Flower"],
+      ["viridian-aurora.json", "Viridian Aurora"]
+    ]);
 
+    for (const [fileName, name] of files) {
+      const raw = readFileSync(new URL(`../../Presets/${fileName}`, import.meta.url), "utf8");
+      const preset = JSON.parse(raw) as {
+        name?: string;
+        controls?: { renderLayer?: string; ribbonFraction?: number };
+        ui?: { viewLocked?: boolean };
+      };
+
+      expect(preset.name, fileName).toBe(name);
       expect(preset.controls?.renderLayer, fileName).toBe("particles");
       expect(preset.controls?.ribbonFraction, fileName).toBe(0);
+      expect(preset.ui?.viewLocked, fileName).toBe(false);
       expect(raw.toLowerCase(), fileName).not.toContain('"midi"');
       expect(raw.toLowerCase(), fileName).not.toContain("nanokontrol");
     }
+
+    expect(appSource).toContain('viewLocked: false');
   });
 });
