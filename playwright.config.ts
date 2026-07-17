@@ -24,7 +24,9 @@ export default defineConfig({
     : {
         command: "pnpm exec vite preview --host 127.0.0.1 --port 4173",
         url: localBaseUrl,
-        reuseExistingServer: !process.env.CI,
+        // Never reuse: a stray dev server on this port would silently swap the
+        // built dist for source, making the suite pass against the wrong artifact.
+        reuseExistingServer: false,
         timeout: 30_000
       },
   projects: [
@@ -35,6 +37,8 @@ export default defineConfig({
         launchOptions: {
           args: [
             "--enable-unsafe-webgpu",
+            // CI runners have no GPU; SwiftShader provides a software WebGPU adapter.
+            ...(process.env.CI ? ["--use-webgpu-adapter=swiftshader"] : []),
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream"
           ]
