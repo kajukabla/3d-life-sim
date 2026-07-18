@@ -2,7 +2,7 @@
 
 ## Fluoddity
 
-Portions of the simulation and several built-in physics presets are derived from [Fluoddity](https://github.com/aphid91/Fluoddity).
+Portions of the simulation and several built-in physics presets are derived from [Fluoddity](https://github.com/aphid91/Fluoddity), in part by way of the same author's stripped-down [Fluoddity-Core](https://github.com/aphid91/Fluoddity-Core); all of the adapted material appears in the MIT-licensed Fluoddity repository.
 
 MIT License
 
