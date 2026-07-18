@@ -15,7 +15,7 @@ import {
 
 declare global {
   interface Window {
-    __fluodditySimSpeedLab?: () => SimSpeedLabSnapshot;
+    __lifesimSimSpeedLab?: () => SimSpeedLabSnapshot;
   }
 }
 
@@ -83,8 +83,8 @@ export function SimSpeedDebugLab() {
   }, [clearSamples]);
 
   useEffect(() => {
-    window.__fluodditySimSpeedLab = () => snapshotRef.current;
-    window.__fluoddityDiagnostics = () => ({
+    window.__lifesimSimSpeedLab = () => snapshotRef.current;
+    window.__lifesimDiagnostics = () => ({
       mode: "sim-speed-lab",
       lab: snapshotRef.current,
       renderer: snapshotRef.current.latest,
@@ -95,8 +95,8 @@ export function SimSpeedDebugLab() {
       }
     });
     return () => {
-      delete window.__fluodditySimSpeedLab;
-      delete window.__fluoddityDiagnostics;
+      delete window.__lifesimSimSpeedLab;
+      delete window.__lifesimDiagnostics;
     };
   }, []);
 

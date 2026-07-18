@@ -84,7 +84,7 @@ export type LiveRuleEvidence = {
 };
 
 export type LiveGpu3dDiagnostics = {
-  renderer: "webgpu-live-fluoddity-3d";
+  renderer: "webgpu-live-3d";
   webgpu: true;
   rulePort: "fluoddity-core-fourier";
   fieldKind: "vector-volume";
@@ -1484,7 +1484,7 @@ export class RealtimeGpuSim3d {
       timings.statsReadMs = performance.now() - statsStart;
     }
     return {
-      renderer: "webgpu-live-fluoddity-3d",
+      renderer: "webgpu-live-3d",
       webgpu: true,
       rulePort: "fluoddity-core-fourier",
       fieldKind: "vector-volume",
@@ -4253,7 +4253,7 @@ export class RealtimeGpuSim3d {
   }
 
   // Runtime escape hatch for A/B-testing the prepared-splat path against the classic
-  // per-corner vertex shader (window.__fluodditySetSplatPrepass in the app shell).
+  // per-corner vertex shader (window.__lifesimSetSplatPrepass in the app shell).
   splatPrepassEnabled = true;
   // A/B escape for the compute splatter (additive only); falls back to the prepared raster draw.
   computeSplatEnabled = true;
@@ -4262,7 +4262,7 @@ export class RealtimeGpuSim3d {
   // time-to-first-frame. Read once inside createPipelines(); flipping it after init has no
   // effect until pipelines are torn down and rebuilt. Default false = current serial path
   // (byte-identical output either way — only compile scheduling differs). Set via
-  // ?parallelPipelines=1 launch param or window.__fluodditySetParallelPipelineCompile.
+  // ?parallelPipelines=1 launch param or window.__lifesimSetParallelPipelineCompile.
   parallelPipelineCompile = false;
 
   private usesPreparedSplatPath(controls: RenderControls): boolean {
@@ -4776,7 +4776,7 @@ export class RealtimeGpuSim3d {
   }
 
   // f16 texture sensing changes update-pass numerics slightly; keep a runtime escape so the
-  // exact f32 buffer path can be A/B'd (window.__fluodditySetFieldTextureSensing).
+  // exact f32 buffer path can be A/B'd (window.__lifesimSetFieldTextureSensing).
   fieldTextureSensingEnabled = true;
 
   private usesFieldTextureSensing(): boolean {

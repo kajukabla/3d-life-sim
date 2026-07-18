@@ -76,7 +76,7 @@ test("runs microphone analysis entirely in the browser", async ({ page }) => {
   await expect(page.getByTestId("audio-capture-status")).toHaveText("Live");
   await expect(page.getByTestId("audio-input-select")).toBeEnabled();
   await expect.poll(() => page.evaluate(() => (
-    (window as unknown as { __fluoddityBrowserAudio?: () => { frameCount: number } })
-      .__fluoddityBrowserAudio?.().frameCount ?? 0
+    (window as unknown as { __lifesimBrowserAudio?: () => { frameCount: number } })
+      .__lifesimBrowserAudio?.().frameCount ?? 0
   ))).toBeGreaterThan(0);
 });

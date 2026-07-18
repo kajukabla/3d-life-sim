@@ -84,14 +84,14 @@ import { controlHint } from "./controlHints";
 
 declare global {
   interface Window {
-    __fluoddityTrackState?: () => { active: boolean; members: number; centroid: readonly [number, number, number]; panX: number; panY: number; distance: number };
-    __fluoddityDiagnostics?: () => Record<string, unknown>;
-    __fluoddityCaptureState?: () => Promise<{
+    __lifesimTrackState?: () => { active: boolean; members: number; centroid: readonly [number, number, number]; panX: number; panY: number; distance: number };
+    __lifesimDiagnostics?: () => Record<string, unknown>;
+    __lifesimCaptureState?: () => Promise<{
       manifest: Record<string, unknown>;
       fieldB64: string;
       particlesB64: string;
     } | null>;
-    __fluoddityParticleOscillationProbe?: (options?: {
+    __lifesimParticleOscillationProbe?: (options?: {
       steps?: number;
       particleCount?: number;
       maxParticles?: number;
@@ -106,7 +106,7 @@ declare global {
     // Deterministic byte-identity probe: reset -> render -> advanceSteps -> captureParticles -> FNV-1a
     // hash of the raw f32 bytes. Same inputs on one device => identical hash, so the emergent-behavior
     // E2E can assert all-zero == baseline and behaviorX>0 != off.
-    __fluoddityHashParticles?: (options?: {
+    __lifesimHashParticles?: (options?: {
       steps?: number;
       particleCount?: number;
       maxParticles?: number;
@@ -115,14 +115,14 @@ declare global {
     }) => Promise<{ hash: string; fieldHash: string; particleCount: number; steps: number; maxDensity: number } | null>;
     // Wall-clock benchmark of N whole sim steps (advanceSteps awaits GPU completion). Used to prove
     // "off costs the same as baseline" and to measure each behavior's GPU cost when on.
-    __fluoddityBenchSteps?: (options?: {
+    __lifesimBenchSteps?: (options?: {
       steps?: number;
       reps?: number;
       warmup?: number;
       particleCount?: number;
       config?: Partial<LiveGpu3dConfig>;
     }) => Promise<{ medianMs: number; samples: number[]; steps: number; particleCount: number } | null>;
-    __fluoddityLoadParityScene?: (spec: {
+    __lifesimLoadParityScene?: (spec: {
       name?: string;
       resolution?: { width: number; height: number };
       camera: { yaw: number; pitch: number; distance: number; panX: number; panY: number; fov: number; focusDistance: number; aperture: number; dofBlur: number; dofEnabled?: boolean };
@@ -131,13 +131,13 @@ declare global {
       seedField?: boolean;
     }) => Promise<{ canvasWidth: number; canvasHeight: number; particleCount: number; hdr?: { width: number; height: number; pixelsB64: string } | null; hdrError?: string }>;
     __parityReady?: boolean;
-    __fluoddityReadCanvasHDR?: () => Promise<{ width: number; height: number; pixelsB64: string } | null>;
+    __lifesimReadCanvasHDR?: () => Promise<{ width: number; height: number; pixelsB64: string } | null>;
     // Offline HDR replay-export hooks (driven by tools/hdr-export). ReplayBegin suspends the live
     // loop, seeds the sim config, and resets to frame 0. ReplayFrame steps the sim by the recorded
     // timestep delta, renders with the recorded controls (camera baked in) + audio, and returns the
     // linear HDR float pixels. ReplayEnd resumes the live loop.
-    __fluoddityReplayBegin?: (firstConfig: LiveGpu3dConfig) => Promise<void>;
-    __fluoddityReplayFrame?: (spec: {
+    __lifesimReplayBegin?: (firstConfig: LiveGpu3dConfig) => Promise<void>;
+    __lifesimReplayFrame?: (spec: {
       timestep: number;
       controls: RenderControls;
       config: LiveGpu3dConfig;
@@ -146,25 +146,25 @@ declare global {
       // output is exactly 9:16 regardless of the replay browser window; omitted = follow the canvas.
       aspect?: number;
     }) => Promise<{ width: number; height: number; bytesPerRow: number; halfB64: string } | null>;
-    __fluoddityReplayEnd?: () => void;
+    __lifesimReplayEnd?: () => void;
     // Timeline evidence hooks: deterministically seek to a frame (resolves after that
     // frame renders), and set the orbit camera instantly (no smoothing) for reproducible
     // camera moves during sequence capture.
-    __fluoddityTimelineSeek?: (frame: number) => Promise<number>;
-    __fluodditySetCameraOrbit?: (pose: { yaw: number; pitch: number; distance: number; panX?: number; panY?: number }) => void;
-    __fluodditySetPlaying?: (playing: boolean) => void;
-    __fluodditySetRenderControl?: (patch: Partial<RenderControls>) => void;
-    __fluodditySetSplatPrepass?: (enabled: boolean) => void;
-    __fluodditySetComputeSplat?: (enabled: boolean) => void;
-    __fluodditySetFieldTextureSensing?: (enabled: boolean) => void;
-    __fluodditySetParticleSort?: (enabled: boolean) => void;
+    __lifesimTimelineSeek?: (frame: number) => Promise<number>;
+    __lifesimSetCameraOrbit?: (pose: { yaw: number; pitch: number; distance: number; panX?: number; panY?: number }) => void;
+    __lifesimSetPlaying?: (playing: boolean) => void;
+    __lifesimSetRenderControl?: (patch: Partial<RenderControls>) => void;
+    __lifesimSetSplatPrepass?: (enabled: boolean) => void;
+    __lifesimSetComputeSplat?: (enabled: boolean) => void;
+    __lifesimSetFieldTextureSensing?: (enabled: boolean) => void;
+    __lifesimSetParticleSort?: (enabled: boolean) => void;
     // Init-time flag (see RealtimeGpuSim3d.parallelPipelineCompile): only takes effect on the
     // next pipeline build, so callers must set it before first init (or use ?parallelPipelines=1).
-    __fluodditySetParallelPipelineCompile?: (enabled: boolean) => void;
-    __fluoddityApplyPreset?: (preset: SavedSettingsPreset) => void;
-    __fluoddityInjectAudioFrame?: (frame: AudioAnalysisFrame, dtSec?: number) => void;
-    __fluoddityInjectMidiMessage?: (data: ArrayLike<number>, inputId?: string, inputName?: string) => void;
-    __fluoddityBrowserAudio?: () => BrowserAudioSnapshot;
+    __lifesimSetParallelPipelineCompile?: (enabled: boolean) => void;
+    __lifesimApplyPreset?: (preset: SavedSettingsPreset) => void;
+    __lifesimInjectAudioFrame?: (frame: AudioAnalysisFrame, dtSec?: number) => void;
+    __lifesimInjectMidiMessage?: (data: ArrayLike<number>, inputId?: string, inputName?: string) => void;
+    __lifesimBrowserAudio?: () => BrowserAudioSnapshot;
   }
 }
 
@@ -1013,7 +1013,7 @@ export function App() {
   // start needs no fresh permission gesture).
   const ownCaptureStreamRef = useRef<MediaStream | null>(null);
   const togglePerformanceRecordingRef = useRef<() => void>(() => {});
-  // While a replay-export driver is driving the renderer via __fluoddityReplayFrame, the live RAF
+  // While a replay-export driver is driving the renderer via __lifesimReplayFrame, the live RAF
   // loop must stand down so it doesn't fight the deterministic replay. replayPrevTimestepRef tracks
   // the sim timestep between replay frames so we step by the exact recorded delta.
   const replayActiveRef = useRef(false);
@@ -1434,11 +1434,11 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    window.__fluoddityInjectMidiMessage = (data: ArrayLike<number>, inputId = "test-midi", inputName = "Test MIDI") => {
+    window.__lifesimInjectMidiMessage = (data: ArrayLike<number>, inputId = "test-midi", inputName = "Test MIDI") => {
       handleMidiData(inputId, inputName, data);
     };
     return () => {
-      delete window.__fluoddityInjectMidiMessage;
+      delete window.__lifesimInjectMidiMessage;
       if (midiUiRafRef.current !== null) {
         cancelAnimationFrame(midiUiRafRef.current);
         midiUiRafRef.current = null;
@@ -1532,10 +1532,10 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    window.__fluoddityInjectAudioFrame = (frame: AudioAnalysisFrame, dtSec = 1 / 60) => {
+    window.__lifesimInjectAudioFrame = (frame: AudioAnalysisFrame, dtSec = 1 / 60) => {
       handleAudioFrame(frame, dtSec);
     };
-    return () => { delete window.__fluoddityInjectAudioFrame; };
+    return () => { delete window.__lifesimInjectAudioFrame; };
   }, [handleAudioFrame]);
 
   // Browser audio runs its DSP on the AudioWorklet rendering thread. The handler goes through a
@@ -1562,12 +1562,12 @@ export function App() {
     });
     browserAudioControllerRef.current = controller;
     setAudioCapture(controller.snapshot());
-    window.__fluoddityBrowserAudio = () => controller.snapshot();
+    window.__lifesimBrowserAudio = () => controller.snapshot();
     if (autoStartBrowserAudio) void controller.start();
     return () => {
       controller.destroy();
       if (browserAudioControllerRef.current === controller) browserAudioControllerRef.current = null;
-      delete window.__fluoddityBrowserAudio;
+      delete window.__lifesimBrowserAudio;
     };
   }, [autoStartBrowserAudio]);
 
@@ -1576,11 +1576,11 @@ export function App() {
   }, [playing]);
 
   useEffect(() => {
-    window.__fluodditySetPlaying = (nextPlaying: boolean) => {
+    window.__lifesimSetPlaying = (nextPlaying: boolean) => {
       playingRef.current = nextPlaying;
       setPlaying(nextPlaying);
     };
-    return () => { delete window.__fluodditySetPlaying; };
+    return () => { delete window.__lifesimSetPlaying; };
   }, []);
 
   useEffect(() => {
@@ -1623,7 +1623,7 @@ export function App() {
       }
       // An offline replay-export driver is owning the renderer right now; the live loop stands
       // down so its free-running step+render can't race the deterministic replay. Keep the RAF
-      // alive so the loop resumes the instant __fluoddityReplayEnd clears the flag.
+      // alive so the loop resumes the instant __lifesimReplayEnd clears the flag.
       if (replayActiveRef.current) {
         raf = requestAnimationFrame(loop);
         return;
@@ -1767,7 +1767,7 @@ export function App() {
             // particles and temporal fog render correctly. Paused/scrubbing uses a
             // deterministic seek (forward = step, backward = reset + replay from zero) then a
             // state render. External capture drives the paused/seek path (see
-            // __fluoddityTimelineSeek), so frame-exact determinism is unaffected by playback.
+            // __lifesimTimelineSeek), so frame-exact determinism is unaffected by playback.
             let targetFrame: number;
             let diagnostics: LiveGpu3dDiagnostics;
             // Free-run unless the timeline transport is enabled, or a deterministic export seek
@@ -1910,18 +1910,18 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    window.__fluoddityTrackState = () => {
+    window.__lifesimTrackState = () => {
       const s = trackerRef.current.state;
       const cam = cameraRef.current;
       return { active: s.active, members: s.members, centroid: s.centroid, panX: cam.panX, panY: cam.panY, distance: cam.distance };
     };
     return () => {
-      delete window.__fluoddityTrackState;
+      delete window.__lifesimTrackState;
     };
   }, []);
 
   useEffect(() => {
-    window.__fluoddityDiagnostics = () => ({
+    window.__lifesimDiagnostics = () => ({
       webgpu,
       mode: "live",
       renderer: liveDiagnosticsRef.current,
@@ -1954,13 +1954,13 @@ export function App() {
         deterministicPreset: true,
         visualNonBlank: (liveDiagnosticsRef.current?.timestep ?? 0) > 0,
         webgpuProbeComplete: webgpu.checked,
-        webgpuRenderer: liveDiagnosticsRef.current?.renderer === "webgpu-live-fluoddity-3d",
+        webgpuRenderer: liveDiagnosticsRef.current?.renderer === "webgpu-live-3d",
         webgpuCompute3d: compute3d?.passed === true,
         webgpuLive3d: liveWebGpuConformance(liveDiagnosticsRef.current)
       }
     });
     return () => {
-      delete window.__fluoddityDiagnostics;
+      delete window.__lifesimDiagnostics;
     };
   }, [audioCapture, audioLastFrame, audioMeters, audioPanel, compute3d, controls, fps, frame, liveConfig, liveDiagnostics, midiActiveInputId, midiInputs, midiLearningKey, midiStatus, overlay, profileGpu, savedSettings, selectedPresetId, selectedSettingsId, sliderModulations, webgpu]);
 
@@ -1974,7 +1974,7 @@ export function App() {
       }
       return btoa(binary);
     };
-    window.__fluoddityCaptureState = async () => {
+    window.__lifesimCaptureState = async () => {
       for (let attempt = 0; renderBusyRef.current && attempt < 120; attempt += 1) {
         await new Promise<void>((resolve) => window.setTimeout(resolve, 16));
       }
@@ -2028,12 +2028,12 @@ export function App() {
       }
     };
     return () => {
-      delete window.__fluoddityCaptureState;
+      delete window.__lifesimCaptureState;
     };
   }, []);
 
   useEffect(() => {
-    window.__fluoddityParticleOscillationProbe = async (options = {}) => {
+    window.__lifesimParticleOscillationProbe = async (options = {}) => {
       const canvas = canvasRef.current;
       if (!canvas) return null;
 
@@ -2123,12 +2123,12 @@ export function App() {
       }
     };
     return () => {
-      delete window.__fluoddityParticleOscillationProbe;
+      delete window.__lifesimParticleOscillationProbe;
     };
   }, [profileGpu]);
 
   useEffect(() => {
-    window.__fluoddityHashParticles = async (options = {}) => {
+    window.__lifesimHashParticles = async (options = {}) => {
       const canvas = canvasRef.current;
       if (!canvas) return null;
       for (let attempt = 0; renderBusyRef.current && attempt < 120; attempt += 1) {
@@ -2209,12 +2209,12 @@ export function App() {
       }
     };
     return () => {
-      delete window.__fluoddityHashParticles;
+      delete window.__lifesimHashParticles;
     };
   }, [profileGpu]);
 
   useEffect(() => {
-    window.__fluoddityBenchSteps = async (options = {}) => {
+    window.__lifesimBenchSteps = async (options = {}) => {
       const canvas = canvasRef.current;
       if (!canvas) return null;
       for (let attempt = 0; renderBusyRef.current && attempt < 120; attempt += 1) {
@@ -2270,13 +2270,13 @@ export function App() {
       }
     };
     return () => {
-      delete window.__fluoddityBenchSteps;
+      delete window.__lifesimBenchSteps;
     };
   }, [profileGpu]);
 
   // Evidence-orchestrator hooks: deterministic per-frame seek + instant camera set.
   useEffect(() => {
-    window.__fluoddityTimelineSeek = (frame: number) => {
+    window.__lifesimTimelineSeek = (frame: number) => {
       const target = Math.max(0, Math.min(TIMELINE_TOTAL_FRAMES - 1, Math.round(frame)));
       playingRef.current = false;
       timelineRef.current = { ...timelineRef.current, playing: false, currentFrame: target };
@@ -2287,7 +2287,7 @@ export function App() {
         timelineSeekWaitersRef.current.push({ frame: target, resolve: () => resolve(target) });
       });
     };
-    window.__fluodditySetCameraOrbit = (pose) => {
+    window.__lifesimSetCameraOrbit = (pose) => {
       const cam = cameraRef.current;
       cam.yaw = pose.yaw;
       cam.targetYaw = pose.yaw;
@@ -2304,33 +2304,33 @@ export function App() {
         cam.targetPanY = pose.panY;
       }
     };
-    window.__fluodditySetRenderControl = (patch) => {
+    window.__lifesimSetRenderControl = (patch) => {
       setControls((c) => ({ ...c, ...patch }));
     };
-    window.__fluodditySetSplatPrepass = (enabled: boolean) => {
+    window.__lifesimSetSplatPrepass = (enabled: boolean) => {
       liveRendererRef.current.splatPrepassEnabled = enabled;
     };
-    window.__fluodditySetComputeSplat = (enabled: boolean) => {
+    window.__lifesimSetComputeSplat = (enabled: boolean) => {
       liveRendererRef.current.computeSplatEnabled = enabled;
     };
-    window.__fluodditySetFieldTextureSensing = (enabled: boolean) => {
+    window.__lifesimSetFieldTextureSensing = (enabled: boolean) => {
       liveRendererRef.current.fieldTextureSensingEnabled = enabled;
     };
-    window.__fluodditySetParticleSort = (enabled: boolean) => {
+    window.__lifesimSetParticleSort = (enabled: boolean) => {
       liveRendererRef.current.particleSortEnabled = enabled;
     };
-    window.__fluodditySetParallelPipelineCompile = (enabled: boolean) => {
+    window.__lifesimSetParallelPipelineCompile = (enabled: boolean) => {
       liveRendererRef.current.parallelPipelineCompile = enabled;
     };
     return () => {
-      delete window.__fluoddityTimelineSeek;
-      delete window.__fluodditySetCameraOrbit;
-      delete window.__fluodditySetRenderControl;
-      delete window.__fluodditySetSplatPrepass;
-      delete window.__fluodditySetComputeSplat;
-      delete window.__fluodditySetFieldTextureSensing;
-      delete window.__fluodditySetParticleSort;
-      delete window.__fluodditySetParallelPipelineCompile;
+      delete window.__lifesimTimelineSeek;
+      delete window.__lifesimSetCameraOrbit;
+      delete window.__lifesimSetRenderControl;
+      delete window.__lifesimSetSplatPrepass;
+      delete window.__lifesimSetComputeSplat;
+      delete window.__lifesimSetFieldTextureSensing;
+      delete window.__lifesimSetParticleSort;
+      delete window.__lifesimSetParallelPipelineCompile;
     };
   }, []);
 
@@ -2351,7 +2351,7 @@ export function App() {
       }
       return btoa(s);
     };
-    window.__fluoddityReadCanvasHDR = async () => {
+    window.__lifesimReadCanvasHDR = async () => {
       const hdr = await liveRendererRef.current.readCanvasHDR();
       if (!hdr) return null;
       return { width: hdr.width, height: hdr.height, pixelsB64: f32ToBase64(hdr.pixels) };
@@ -2359,7 +2359,7 @@ export function App() {
     // Offline HDR replay export. The driver suspends the live loop (replayActiveRef), then walks
     // the recording frame-by-frame: each ReplayFrame steps the deterministic sim by the recorded
     // timestep delta and re-renders with the recorded controls + audio, with no real-time clock.
-    window.__fluoddityReplayBegin = async (firstConfig) => {
+    window.__lifesimReplayBegin = async (firstConfig) => {
       replayActiveRef.current = true;
       playingRef.current = false;
       const sim = liveRendererRef.current;
@@ -2372,7 +2372,7 @@ export function App() {
       await sim.reset();
       replayPrevTimestepRef.current = 0;
     };
-    window.__fluoddityReplayFrame = async (spec) => {
+    window.__lifesimReplayFrame = async (spec) => {
       if (!canvasRef.current) return null;
       const sim = liveRendererRef.current;
       const stepDelta = spec.timestep - replayPrevTimestepRef.current;
@@ -2394,7 +2394,7 @@ export function App() {
       if (!hdr) return null;
       return { width: hdr.width, height: hdr.height, bytesPerRow: hdr.bytesPerRow, halfB64: u8ToBase64(hdr.data) };
     };
-    window.__fluoddityReplayEnd = () => {
+    window.__lifesimReplayEnd = () => {
       replayActiveRef.current = false;
       replayPrevTimestepRef.current = 0;
       liveRendererRef.current.captureFinalHDR = false;
@@ -2402,10 +2402,10 @@ export function App() {
       liveRendererRef.current.aspectOverride = 0;
     };
     return () => {
-      delete window.__fluoddityReadCanvasHDR;
-      delete window.__fluoddityReplayBegin;
-      delete window.__fluoddityReplayFrame;
-      delete window.__fluoddityReplayEnd;
+      delete window.__lifesimReadCanvasHDR;
+      delete window.__lifesimReplayBegin;
+      delete window.__lifesimReplayFrame;
+      delete window.__lifesimReplayEnd;
     };
   }, []);
 
@@ -2455,7 +2455,7 @@ export function App() {
     };
 
     window.__parityReady = false;
-    window.__fluoddityLoadParityScene = async (spec) => {
+    window.__lifesimLoadParityScene = async (spec) => {
       const sim = liveRendererRef.current;
       const count = liveConfigRef.current.particleCount;
       // Build the full particle buffer: synthetic in [0..N-1], invisible elsewhere.
@@ -2581,7 +2581,7 @@ export function App() {
       } as any;
     };
     return () => {
-      delete window.__fluoddityLoadParityScene;
+      delete window.__lifesimLoadParityScene;
       delete window.__parityReady;
     };
   }, []);
@@ -2733,10 +2733,10 @@ export function App() {
 
   // Expose for preset-sweep automation.
   useEffect(() => {
-    window.__fluoddityApplyPreset = (preset: SavedSettingsPreset) => {
+    window.__lifesimApplyPreset = (preset: SavedSettingsPreset) => {
       applySettingsPreset(preset);
     };
-    return () => { delete window.__fluoddityApplyPreset; };
+    return () => { delete window.__lifesimApplyPreset; };
   }, [applySettingsPreset]);
 
   const chooseCuratedPreset = useCallback((id: string) => {
@@ -4380,7 +4380,7 @@ function liveWebGpuConformance(live: LiveGpu3dDiagnostics | null): boolean {
     live.renderMode === "particle-splats" ||
     live.renderMode === "volume-density-raymarch";
   const fieldStatsOk = live.renderMode === "particle-splats" || live.fieldStats.nonzeroVoxels > 0;
-  return live.renderer === "webgpu-live-fluoddity-3d" &&
+  return live.renderer === "webgpu-live-3d" &&
     renderModeOk &&
     live.depositMode === "particle-atomic-fixed-point" &&
     live.timestep > 0 &&
@@ -4479,7 +4479,7 @@ async function saveSettingsPresetWithFilePicker(
   defaultName: string,
   buildPreset: (name: string) => SavedSettingsPreset
 ): Promise<SavedSettingsPreset | null> {
-  const suggestedName = `${filenameSlug(defaultName)}.fluoddity3d.json`;
+  const suggestedName = `${filenameSlug(defaultName)}.lifesim3d.json`;
   const pickerWindow = window as FilePickerWindow;
   if (pickerWindow.showSaveFilePicker) {
     try {
@@ -4510,7 +4510,7 @@ function downloadSettingsPreset(settings: SavedSettingsPreset): void {
   const url = URL.createObjectURL(settingsPresetBlob(settings));
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${filenameSlug(settings.name)}.fluoddity3d.json`;
+  link.download = `${filenameSlug(settings.name)}.lifesim3d.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -4528,7 +4528,7 @@ async function savePerformanceFile(filename: string, blob: Blob): Promise<string
 
 function savePerformanceRecording(recording: AutomationRecording): Promise<string | null> {
   const blob = new Blob([JSON.stringify(recording)], { type: "application/json" });
-  return savePerformanceFile(`performance_${recording.frames.length}f.fluoddity-recording.json`, blob);
+  return savePerformanceFile(`performance_${recording.frames.length}f.lifesim-recording.json`, blob);
 }
 
 // Pairs with the recording JSON above (same frame-count stem) so the two files are obviously a
@@ -4935,12 +4935,12 @@ function makeSettingsId(): string {
 }
 
 function filenameSlug(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "fluoddity-settings";
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "lifesim-settings";
 }
 
 function settingsNameFromFileName(value: string): string {
   return value
-    .replace(/\.fluoddity3d\.json$/i, "")
+    .replace(/\.(lifesim3d|fluoddity3d)\.json$/i, "")
     .replace(/\.json$/i, "")
     .trim();
 }

@@ -8,7 +8,7 @@ import {
 
 function presetFile(overrides: Partial<{ name: string; size: number; text: () => Promise<string> }> = {}) {
   return {
-    name: "look.fluoddity3d.json",
+    name: "look.lifesim3d.json",
     size: 128,
     text: vi.fn(async () => '{"name":"Look"}'),
     ...overrides
