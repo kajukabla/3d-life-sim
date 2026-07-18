@@ -11,6 +11,9 @@ test-results/
 .env.*
 !.env.example
 
+Vids/
+SS/
+
 .DS_Store
 Thumbs.db
 .idea/

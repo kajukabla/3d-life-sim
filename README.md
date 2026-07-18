@@ -1,6 +1,17 @@
 # 3D Life Sim
 
+<p align="center">
+  <img src="docs/demo2.webp" alt="A luminous core suspended in a lattice of crystalline particle filaments" width="49%">
+  <img src="docs/demo.webp" alt="Particles swirling into glowing ember vortices in the 3D Life Sim" width="49%">
+</p>
+
 A real-time, browser-based 3D particle life simulation powered by WebGPU. Hundreds of thousands of particles respond to a configurable local field, creating evolving swarms, filaments, shells, and emergent structures.
+
+<p align="center">
+  <img src="docs/hero.jpg" alt="A glowing cellular orb with radiating filaments" width="32%">
+  <img src="docs/creatures.jpg" alt="A menagerie of luminous particle creatures" width="32%">
+  <img src="docs/lattice.jpg" alt="An electric-blue lattice radiating from a bright core" width="32%">
+</p>
 
 ## Live demo
 
