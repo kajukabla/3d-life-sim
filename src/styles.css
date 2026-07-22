@@ -166,6 +166,86 @@ select {
   pointer-events: none;
 }
 
+/* Floating menu toggle for touch clients (no M key on phones). */
+.panel-toggle {
+  position: absolute;
+  z-index: 4;
+  top: calc(10px + env(safe-area-inset-top));
+  right: calc(10px + env(safe-area-inset-right));
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 17px;
+  line-height: 1;
+  background: rgba(8, 12, 13, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 9px;
+  backdrop-filter: blur(10px);
+}
+
+.app-shell.is-mobile .panel-toggle {
+  display: grid;
+}
+
+.app-shell:fullscreen .panel-toggle,
+.app-shell:-webkit-full-screen .panel-toggle {
+  display: none;
+}
+
+/* Compact cockpit for touch clients. */
+.app-shell.is-mobile .control-panel {
+  padding: 10px 10px 14px;
+}
+
+.app-shell.is-mobile .control-row {
+  grid-template-columns: 80px minmax(0, 1fr) 44px;
+  gap: 7px;
+  min-height: 30px;
+  font-size: 11px;
+}
+
+.app-shell.is-mobile .control-panel button {
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.app-shell.is-mobile .slider-modulation-body {
+  padding-left: 87px;
+}
+
+/* Portrait: the menu is a half-screen bottom sheet. */
+@media (orientation: portrait) {
+  .app-shell.is-mobile .control-panel {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    height: 50vh;
+    height: 50dvh;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(255, 255, 255, 0.13);
+    border-left: 0;
+    box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.28);
+  }
+
+  .app-shell.is-mobile.panel-collapsed .control-panel {
+    transform: translateY(calc(100% + 8px));
+  }
+}
+
+/* Landscape: the menu is a half-width side drawer. */
+@media (orientation: landscape) {
+  .app-shell.is-mobile .control-panel {
+    width: 50vw;
+    max-width: none;
+  }
+}
+
 button {
   min-height: 36px;
   color: #fff6e8;

@@ -40,6 +40,7 @@ import { TIMELINE_FPS, TIMELINE_TOTAL_FRAMES, advanceFrame, normalizeLoop, planS
 import { useTimelineTransport } from "./useTimelineTransport";
 import { createCameraRecorder, type CameraPose } from "./cameraRecorder";
 import { audioMicFromLaunch, chooseBootSettingsId, demoLaunchFromSearch, embedFromLaunch, parallelPipelinesFromLaunch, shouldStartPlaying } from "./launchOptions";
+import { isCoarsePointerClient, mobileParticleCount } from "./mobileLaunch";
 import { curatedPresetIds, defaultCuratedPresetId } from "./curatedPresets";
 import { readPresetJsonFile, sanitizePresetName } from "./presetFiles";
 import {
@@ -976,6 +977,10 @@ export function App() {
     targetPanY: initialLiveState.controls.cameraPanY,
     targetFov: initialLiveState.controls.fov
   });
+  // Two-finger gestures: live touch points on the canvas plus the pinch baseline
+  // (span/camera distance at pinch start; x/y is the last centroid for panning).
+  const touchPointsRef = useRef(new Map<number, { x: number; y: number }>());
+  const pinchRef = useRef<{ span: number; distance: number; x: number; y: number } | null>(null);
   const dragRef = useRef<{ active: boolean; mode: ViewportDragMode | null; pointerId: number | null; x: number; y: number; startX: number; startY: number }>({
     active: false,
     mode: null,
@@ -1075,15 +1080,18 @@ export function App() {
   const [overlay, setOverlay] = useState(false);
   const [dragMode, setDragMode] = useState<ViewportDragMode | null>(null);
   // Embedded mode boots clean (menu + FPS hidden) so site visitors see only the sim;
-  // the M key toggles the cockpit back.
-  const [panelOpen, setPanelOpen] = useState(() => !embedFromLaunch(window.location.search));
+  // the M key toggles the cockpit back. Touch-primary clients boot collapsed too and
+  // use the floating menu toggle instead of the keyboard.
+  const [embedLaunch] = useState(() => embedFromLaunch(window.location.search));
+  const [mobileClient] = useState(() => isCoarsePointerClient());
+  const [panelOpen, setPanelOpen] = useState(!embedLaunch && !mobileClient);
   // Auto-hide the mouse cursor after a short idle while fullscreen (revealed on any move), so the
   // projected image is clean. Gated to :fullscreen in CSS, so it never hides in windowed mode.
   const [cursorIdle, setCursorIdle] = useState(false);
   // Mirror panelOpen into a ref so the rAF loop can skip publishing diagnostics state (which
   // re-renders the whole ~126-control panel ~5x/sec and causes frame-time stutter) when the
   // panel is hidden. Hiding the menu (M) then yields zero per-frame React re-renders.
-  const panelOpenRef = useRef(true);
+  const panelOpenRef = useRef(panelOpen);
   useEffect(() => { panelOpenRef.current = panelOpen; }, [panelOpen]);
   // Latest audio band levels (low/mid/high), updated every audio frame regardless of panel
   // visibility, so the audio-reactive color mode keeps driving the visuals during a performance.
@@ -2671,7 +2679,10 @@ export function App() {
   }, [updateLiveConfig]);
 
   const applySettingsPreset = useCallback((settings: SavedSettingsPreset) => {
-    const nextConfig = sanitizeLiveConfig(settings.liveConfig);
+    const sanitizedConfig = sanitizeLiveConfig(settings.liveConfig);
+    const nextConfig = mobileClient
+      ? { ...sanitizedConfig, particleCount: mobileParticleCount(sanitizedConfig.particleCount) }
+      : sanitizedConfig;
     const nextControls = normalizeRenderControlsForDisplayMode("live", sanitizeRenderControls(settings.controls));
     const uiSource = isRecord(settings.ui) ? settings.ui : settings;
     const nextUi = sanitizeSavedUiState(uiSource, fallbackPlayingForSavedUi(uiSource));
@@ -2729,7 +2740,7 @@ export function App() {
       targetFov: nextControls.fov
     };
     requestLiveReset();
-  }, [requestLiveReset, timelineDispatch]);
+  }, [mobileClient, requestLiveReset, timelineDispatch]);
 
   // Expose for preset-sweep automation.
   useEffect(() => {
@@ -2853,6 +2864,24 @@ export function App() {
     if (viewLockedRef.current) return;
     if (event.button !== 0 && event.button !== 1) return;
     event.preventDefault();
+    if (event.pointerType === "touch") {
+      touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      event.currentTarget.setPointerCapture(event.pointerId);
+      if (touchPointsRef.current.size === 2) {
+        // Second finger down: switch from orbit to pinch (zoom + two-finger pan).
+        const [a, b] = [...touchPointsRef.current.values()];
+        pinchRef.current = {
+          span: Math.max(12, Math.hypot(b.x - a.x, b.y - a.y)),
+          distance: cameraRef.current.targetDistance,
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2
+        };
+        dragRef.current = { active: false, mode: null, pointerId: null, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY };
+        setDragMode(null);
+        return;
+      }
+      if (touchPointsRef.current.size > 2) return;
+    }
     const mode: ViewportDragMode = event.button === 1 ? "pan" : "orbit";
     const camera = cameraRef.current;
     setCameraTarget({
@@ -2869,6 +2898,30 @@ export function App() {
 
   const tumble = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (viewLockedRef.current) return;
+    if (event.pointerType === "touch" && touchPointsRef.current.has(event.pointerId)) {
+      touchPointsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const pinch = pinchRef.current;
+      if (pinch && touchPointsRef.current.size >= 2) {
+        event.preventDefault();
+        const [a, b] = [...touchPointsRef.current.values()];
+        const span = Math.max(12, Math.hypot(b.x - a.x, b.y - a.y));
+        const cx = (a.x + b.x) / 2;
+        const cy = (a.y + b.y) / 2;
+        const camera = cameraRef.current;
+        const canvas = event.currentTarget;
+        const width = Math.max(1, canvas.clientWidth);
+        const height = Math.max(1, canvas.clientHeight);
+        const aspect = width / height;
+        const scale = camera.targetDistance / cameraPanFocal;
+        setCameraTarget({
+          distance: pinch.distance * (pinch.span / span),
+          panX: camera.targetPanX + ((cx - pinch.x) * 2 / width) * aspect * scale,
+          panY: camera.targetPanY - ((cy - pinch.y) * 2 / height) * scale
+        });
+        pinchRef.current = { ...pinch, x: cx, y: cy };
+        return;
+      }
+    }
     const drag = dragRef.current;
     if (!drag.active || drag.pointerId !== event.pointerId) return;
     event.preventDefault();
@@ -2918,6 +2971,26 @@ export function App() {
   }, []);
 
   const endTumble = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
+    if (event.pointerType === "touch" && touchPointsRef.current.delete(event.pointerId)) {
+      if (touchPointsRef.current.size >= 2 && pinchRef.current) {
+        // A third finger lifted while two remain: re-baseline the pinch.
+        const [a, b] = [...touchPointsRef.current.values()];
+        pinchRef.current = {
+          span: Math.max(12, Math.hypot(b.x - a.x, b.y - a.y)),
+          distance: cameraRef.current.targetDistance,
+          x: (a.x + b.x) / 2,
+          y: (a.y + b.y) / 2
+        };
+      } else if (touchPointsRef.current.size < 2) pinchRef.current = null;
+      if (touchPointsRef.current.size === 1 && !dragRef.current.active && !viewLockedRef.current) {
+        // Pinch ended with one finger still down: rebase it into an orbit drag so the
+        // view keeps steering without a jump.
+        const [[id, point]] = [...touchPointsRef.current.entries()];
+        dragRef.current = { active: true, mode: "orbit", pointerId: id, x: point.x, y: point.y, startX: point.x, startY: point.y };
+        setDragMode("orbit");
+        return;
+      }
+    }
     const drag = dragRef.current;
     if (drag.pointerId !== null && drag.pointerId !== event.pointerId) return;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -3026,7 +3099,7 @@ export function App() {
   const vertexCount = liveVertexCount(liveDiagnostics, liveConfig);
   return (
     <SliderModulationContext.Provider value={sliderModulationContext}>
-      <main ref={appShellRef} className={`app-shell${panelOpen ? "" : " panel-collapsed"}${cursorIdle ? " cursor-idle" : ""}`}>
+      <main ref={appShellRef} className={`app-shell${panelOpen ? "" : " panel-collapsed"}${mobileClient ? " is-mobile" : ""}${cursorIdle ? " cursor-idle" : ""}`}>
       <section className="viewport-band" data-testid="viewport-band">
         <canvas
           ref={canvasRef}
@@ -3427,6 +3500,19 @@ export function App() {
         />
 
       </aside>
+      {mobileClient && !embedLaunch ? (
+        <button
+          type="button"
+          className="panel-toggle"
+          data-testid="panel-toggle"
+          aria-label={panelOpen ? "Close menu" : "Open menu"}
+          aria-expanded={panelOpen}
+          aria-controls="control-panel"
+          onClick={() => setPanelOpen((value) => !value)}
+        >
+          {panelOpen ? "✕" : "☰"}
+        </button>
+      ) : null}
       </main>
     </SliderModulationContext.Provider>
   );
