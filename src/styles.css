@@ -23,6 +23,29 @@ select {
   font: inherit;
 }
 
+.desktop-only {
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  background: #020303;
+}
+
+.desktop-only strong {
+  font-size: 26px;
+  color: #f5d996;
+}
+
+.desktop-only span {
+  max-width: 300px;
+  color: #9fb4b3;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .app-shell {
   position: relative;
   width: 100%;
