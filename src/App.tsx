@@ -2683,7 +2683,11 @@ export function App() {
     const nextConfig = mobileClient
       ? { ...sanitizedConfig, particleCount: mobileParticleCount(sanitizedConfig.particleCount) }
       : sanitizedConfig;
-    const nextControls = normalizeRenderControlsForDisplayMode("live", sanitizeRenderControls(settings.controls));
+    const sanitizedControls = normalizeRenderControlsForDisplayMode("live", sanitizeRenderControls(settings.controls));
+    // Mobile render tuning: no glow, lighter support mask.
+    const nextControls = mobileClient
+      ? { ...sanitizedControls, particleGlowCore: 0, particleSupportMask: 0.2 }
+      : sanitizedControls;
     const uiSource = isRecord(settings.ui) ? settings.ui : settings;
     const nextUi = sanitizeSavedUiState(uiSource, fallbackPlayingForSavedUi(uiSource));
     const nextAudio = sanitizeSavedAudioState(settings.audio);
