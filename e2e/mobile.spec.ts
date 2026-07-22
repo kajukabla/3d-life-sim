@@ -31,9 +31,9 @@ test.describe("mobile cockpit", () => {
     await expect(shell).toHaveClass(/is-mobile/);
     await expect(shell).toHaveClass(/panel-collapsed/);
 
-    // Default preset holds 3,399,680 particles on desktop; mobile boots at a tenth,
+    // Default preset holds 3,399,680 particles on desktop; mobile caps at ~200K,
     // with glow off and a lighter support mask.
-    await expect.poll(async () => (await readProfile(page)).liveConfig.particleCount).toBe(339968);
+    await expect.poll(async () => (await readProfile(page)).liveConfig.particleCount).toBe(199680);
     const controls = (await readProfile(page)).controls;
     expect(controls.particleGlowCore).toBe(0);
     expect(controls.particleSupportMask).toBe(0.2);
